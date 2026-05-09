@@ -1,0 +1,349 @@
+/* ══════════════════════════════════════════
+   DARK MODE — 전면 재작성
+   ══════════════════════════════════════════ */
+[data-theme="dark"] {
+    /* ── KB DarkBlue 기반 다크모드 ── */
+    --bg-color:    #252528;        /* KB DarkBlue보다 약간 어두운 배경 */
+    --text-main:   #E8E8E8;
+    --text-sub:    #999999;        /* KB Disable */
+    --border-color:#545860;        /* KB DarkBlue Light */
+    --white:       #3F3F42;        /* KB DarkBlue — 카드 배경 */
+    --chart-text:  #FFFFFF;
+    /* 단계 막대 — 다크모드도 KB Yellow/Orange 계열 유지 (어두운 배경에서 잘 보임) */
+    --phase-1: #FFD338;
+    --phase-2: #FFBC00;
+    --phase-3: #FD9C26;
+    --phase-4: #FF7A1A;
+    --phase-5: #B09A8A;
+}
+
+/* 기본 */
+[data-theme="dark"] body {
+    background: #1C1C1E;
+    background-image:
+        radial-gradient(ellipse 55% 45% at 0% 0%,   rgba(255,211,56,0.07) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 40% at 100% 100%, rgba(244,102,0,0.06) 0%, transparent 60%);
+    background-attachment: fixed;
+    color: var(--text-main);
+}
+[data-theme="dark"] header { background: rgba(37,37,40,0.92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 2px 16px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06); }
+
+/* 헤더 / 네비 */
+[data-theme="dark"] .live-clock-container { background: #3F3F42; border-color: #545860; border-left-color: #FFD338; }
+[data-theme="dark"] .clock-date { color: #E8E8E8; }
+[data-theme="dark"] .clock-time { color: #E8E8E8; }
+[data-theme="dark"] .clock-sep { background: #545860; }
+[data-theme="dark"] .nav-tabs { border-color: #545860; }
+[data-theme="dark"] .nav-tab { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .nav-tab:hover:not(.active) { background: #4A4A4E; color: #E8E8E8; }
+[data-theme="dark"] #tabAdmin:not(.active) { background: #3F3F42; border-color: #545860; color: #FD9C26; }
+[data-theme="dark"] #tabAdmin:not(.active):hover { background: #4A4A4E; color: #FFD338; }
+
+/* IO 툴바 */
+[data-theme="dark"] .io-toolbar { background: #3F3F42; border-color: #545860; }
+[data-theme="dark"] .io-toolbar-label { background: #545860; color: #E8E8E8; }
+[data-theme="dark"] .io-toolbar-divider { background: #545860; }
+[data-theme="dark"] .io-btn.export { background: #2a2a2e; color: #FFD338; border-color: #FFBC00; }
+[data-theme="dark"] .io-btn.import { background: #2a2a2e; color: #FD9C26; border-color: #F46600; }
+[data-theme="dark"] .io-btn.merge  { background: #2a2a2e; color: #B09A8A; border-color: #7D6C59; }
+[data-theme="dark"] .io-last-saved { color: #999999; }
+
+/* 통계 카드 */
+[data-theme="dark"] .stat-card { background: rgba(63,63,66,0.80); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-color: rgba(255,255,255,0.07); }
+[data-theme="dark"] .stat-card .label { color: #999999; }
+[data-theme="dark"] .stat-card .value { color: #E8E8E8; }
+[data-theme="dark"] .stat-card.sc-total  { border-left-color: #FFD338; }
+[data-theme="dark"] .stat-card.sc-total .value { color: #FFD338; }
+[data-theme="dark"] .stat-card.sc-ongoing { border-left-color: #6699FF; }
+[data-theme="dark"] .stat-card.sc-ongoing .value { color: #6699FF; }
+[data-theme="dark"] .stat-card.sc-done    { border-left-color: #34D399; }
+[data-theme="dark"] .stat-card.sc-done    .value { color: #34D399; }
+[data-theme="dark"] .stat-card.sc-early   { border-left-color: #a3e635; }
+[data-theme="dark"] .stat-card.sc-early   .value { color: #a3e635; }
+
+/* ── 간트 컨테이너 ── */
+[data-theme="dark"] .gantt-container { background: rgba(63,63,66,0.70); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+[data-theme="dark"] .gantt-header { background: linear-gradient(135deg, #3F3F42 0%, #333336 100%); border-color: #545860; border-left-color: #FFD338; }
+[data-theme="dark"] .gantt-header h2 { color: #E8E8E8; }
+[data-theme="dark"] .gantt-scroll { background: #2A2A2D; }
+
+/* 타임라인 헤더 */
+[data-theme="dark"] .timeline-header { background: #2A2A2D; border-bottom-color: #545860; }
+[data-theme="dark"] .month-grid { border-color: #545860; }
+[data-theme="dark"] .month-cell { border-color: #545860; background: #2A2A2D; }
+[data-theme="dark"] .month-label { background: #222225; color: #999999; border-color: #545860; }
+[data-theme="dark"] .week-ticks { background: #1E1E21; }
+[data-theme="dark"] .week-tick { background: #454548; }
+[data-theme="dark"] .week-tick.mid { background: #555558; }
+
+/* 현재 달 강조 (다크) — KB Yellow */
+[data-theme="dark"] .month-cell.current-month-col { background: rgba(255,211,56,0.07); }
+[data-theme="dark"] .month-cell.current-month-col .month-label { background: linear-gradient(135deg, #3A3000 0%, #5A4800 100%); color: #FFD338; border-color: #FFBC00; }
+[data-theme="dark"] .bar-area > .grid-line.current-month-bar { background: rgba(255,211,56,0.08); }
+
+/* 간트 행 — KB DarkBlue 계열 */
+[data-theme="dark"] .gantt-row { background: #2A2A2D; border-color: #3F3F42; }
+[data-theme="dark"] .gantt-row:nth-child(even) { background: #252528; }
+[data-theme="dark"] .gantt-row:nth-child(even) .bar-area { background: #252528; }
+[data-theme="dark"] .gantt-row:nth-child(even) .open-col { background: #252528; }
+[data-theme="dark"] .gantt-row:hover { background: #35301E; }
+[data-theme="dark"] .gantt-row:hover .bar-area { background: #35301E; }
+[data-theme="dark"] .gantt-row:hover .open-col { background: #35301E; }
+[data-theme="dark"] .bar-area { background: #2A2A2D; border-color: #3F3F42; }
+[data-theme="dark"] .grid-line { border-color: #3F3F42; }
+
+/* 프로젝트 정보 (좌측 사이드바) */
+[data-theme="dark"] .project-info { background: transparent; border-color: #545860; }
+[data-theme="dark"] .project-name { color: #E8E8E8; }
+[data-theme="dark"] .project-meta { color: #999999; }
+[data-theme="dark"] .project-meta .mm-val { color: #CCCCCC; }
+[data-theme="dark"] .project-meta .pm-val { color: #CCCCCC; }
+[data-theme="dark"] .project-meta .budget-val { color: #FFD338; }
+[data-theme="dark"] .project-meta-sep { color: #545860; }
+
+/* 오늘 표시선 */
+[data-theme="dark"] .today-dot { border-color: #1e293b; }
+[data-theme="dark"] .today-line { background: #ef4444; }
+
+/* 과거 오버레이 */
+[data-theme="dark"] .past-overlay { background: rgba(0,0,0,0.15); }
+
+/* 필터 버튼 — KB 다크 버전 */
+[data-theme="dark"] .filter-btn-all { background: #3F3F42; color: #999999; border-color: #545860; }
+[data-theme="dark"] .filter-btn-all:hover:not(.active) { background: #4A4A4E; color: #E8E8E8; }
+[data-theme="dark"] .filter-btn-team-a { background: #3A1800; color: #FF9040; border-color: #F46600; }
+[data-theme="dark"] .filter-btn-team-a:hover:not(.active) { background: #4E2000; color: #FFB070; border-color: #FF7A1A; }
+[data-theme="dark"] .filter-btn-team-b { background: #3A2800; color: #FFB347; border-color: #FD9C26; }
+[data-theme="dark"] .filter-btn-team-b:hover:not(.active) { background: #4E3400; color: #FFC870; border-color: #FFB347; }
+[data-theme="dark"] .filter-btn-team-c { background: #3A3200; color: #FFD338; border-color: #FFBC00; }
+[data-theme="dark"] .filter-btn-team-c:hover:not(.active) { background: #4E4400; color: #FFE070; border-color: #FFD338; }
+[data-theme="dark"] .filter-btn-team-d { background: #062E1F; color: #34D399; border-color: #059669; }
+[data-theme="dark"] .filter-btn-team-d:hover:not(.active) { background: #0A3D28; color: #6EE7B7; border-color: #10B981; }
+[data-theme="dark"] .filter-btn-team-d.active { background: #059669; color: white; border-color: #059669; }
+[data-theme="dark"] .filter-btn-team-e { background: #001540; color: #6699FF; border-color: #0066FF; }
+[data-theme="dark"] .filter-btn-team-e:hover:not(.active) { background: #001F5C; color: #99BBFF; border-color: #3388FF; }
+[data-theme="dark"] .filter-btn-team-e.active { background: #0055DD; color: white; border-color: #0066FF; }
+[data-theme="dark"] .filter-btn-team-f { background: #1A0A35; color: #A78BFA; border-color: #7C3AED; }
+[data-theme="dark"] .filter-btn-team-f:hover:not(.active) { background: #240D4A; color: #C4B5FD; border-color: #9061F9; }
+[data-theme="dark"] .filter-btn-team-f.active { background: #6D28D9; color: white; border-color: #7C3AED; }
+
+/* 상단 타이틀 */
+[data-theme="dark"] .header-title h1 { color: #E8E8E8; }
+[data-theme="dark"] .header-title .sub-tag { color: #FFD338; }
+
+/* 섹션 헤더 */
+[data-theme="dark"] .section-header-title { color: #E8E8E8; }
+[data-theme="dark"] .section-header-divider { background: #545860; }
+[data-theme="dark"] .section-header-count { background: #3F3F42; color: #999999; }
+[data-theme="dark"] .edit-hint { color: #999999; }
+
+/* 프로젝트 카드 */
+[data-theme="dark"] .project-card { background: rgba(63,63,66,0.75) !important; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+[data-theme="dark"] .project-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.45); border-color: rgba(255,211,56,0.18); }
+[data-theme="dark"] .project-card.card-checked { background: #2a1a00 !important; box-shadow: 0 0 0 2px #F46600, 0 6px 20px rgba(244,102,0,0.2); }
+[data-theme="dark"] .card-title { color: #E8E8E8; }
+[data-theme="dark"] .card-divider { border-color: #545860; }
+[data-theme="dark"] .card-meta-label { background: #545860 !important; color: #E8E8E8 !important; }
+[data-theme="dark"] .card-meta-value { color: #CCCCCC; }
+[data-theme="dark"] .card-footer-metrics { background: #222225; border-color: #3F3F42; }
+[data-theme="dark"] .card-metric { border-color: #3F3F42; }
+[data-theme="dark"] .card-metric.open { background: transparent; }
+[data-theme="dark"] .card-metric-label { color: #999999; }
+[data-theme="dark"] .card-metric-value { color: #CCCCCC; }
+[data-theme="dark"] .card-metric.open .card-metric-value { color: #FFD338; }
+[data-theme="dark"] .card-metric.budget .card-metric-value { color: #FD9C26; }
+[data-theme="dark"] .card-phase-name { color: #FFD338; }
+[data-theme="dark"] .card-phase-date { color: #999999; }
+[data-theme="dark"] .card-phase-desc { color: #CCCCCC; }
+
+/* 목록뷰 테이블 */
+[data-theme="dark"] .list-table { border-color: #545860; }
+[data-theme="dark"] .list-table th { background: #3F3F42; color: #E8E8E8; border-color: #545860; }
+[data-theme="dark"] .list-table td { background: #2A2A2D; border-color: #3F3F42; color: #CCCCCC; }
+[data-theme="dark"] .list-table tbody tr:nth-child(even) td { background: #252528; }
+[data-theme="dark"] .list-table tr:hover td { background: #35301E; }
+[data-theme="dark"] .list-td-name { color: #E8E8E8; }
+[data-theme="dark"] .list-no-num   { color: #999999; }
+[data-theme="dark"] .list-team-tag { color: inherit; }
+[data-theme="dark"] .list-period   { color: #CCCCCC; }
+[data-theme="dark"] .list-duration { color: #FD9C26; }
+[data-theme="dark"] .list-phase    { color: #FFD338; }
+[data-theme="dark"] .list-budget   { color: #FD9C26; }
+[data-theme="dark"] .dday-badge.dday-urgent { background: #3A0A00; color: #FF7A1A; }
+[data-theme="dark"] .dday-badge.dday-warn   { background: #3A2800; color: #FFB347; }
+[data-theme="dark"] .dday-badge.dday-normal { background: #3F3F42; color: #999999; }
+[data-theme="dark"] .dday-badge.dday-today  { background: #3A1800; color: #FF9040; }
+[data-theme="dark"] .dday-badge.dday-past   { background: #3F3F42; color: #999999; }
+[data-theme="dark"] .dday-badge.open-past   { background: transparent; color: #999999;  font-size: inherit; }
+[data-theme="dark"] .dday-badge.open-soon   { background: transparent; color: #FD9C26;  font-size: inherit; }
+[data-theme="dark"] .dday-badge.open-future { background: transparent; color: #FFD338;  font-size: inherit; }
+
+/* 검색 */
+[data-theme="dark"] .search-input { background: #3F3F42; border-color: #545860; color: #E8E8E8; }
+[data-theme="dark"] .search-input::placeholder { color: #777777; }
+[data-theme="dark"] .search-btn { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .search-btn:hover { background: #4A4A4E; color: #E8E8E8; }
+
+/* 뷰 컨트롤 */
+[data-theme="dark"] .view-btn { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .view-btn.active { background: #545860; color: #E8E8E8; border-color: #6A6E78; }
+[data-theme="dark"] .excel-btn { background: #2a3322; color: #88CC66; border-color: #4A7030; }
+[data-theme="dark"] .btn-col-toggle { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .col-panel { background: #2A2A2D; border-color: #545860; }
+[data-theme="dark"] .col-panel label { color: #CCCCCC; }
+[data-theme="dark"] .bulk-toolbar-sep { background: #545860; }
+
+/* 등록 폼 */
+[data-theme="dark"] .input-section { background: #2A2A2D; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+[data-theme="dark"] .admin-tabs { background: #222225; }
+[data-theme="dark"] .admin-tab-btn { color: #999999; }
+[data-theme="dark"] .admin-tab-btn.active { background: #3F3F42; color: #E8E8E8; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+[data-theme="dark"] .form-section-title h2 { color: #E8E8E8; border-left-color: #FFD338; }
+[data-theme="dark"] .form-block { background: #3F3F42; box-shadow: none; }
+[data-theme="dark"] .form-block-label { color: #CCCCCC; }
+[data-theme="dark"] .form-group label { color: #CCCCCC; }
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select { background: #2A2A2D; border-color: #545860; color: #E8E8E8; }
+[data-theme="dark"] .form-group input:hover,
+[data-theme="dark"] .form-group select:hover { background: #252528; border-color: #6A6E78; }
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group select:focus { background: #2A2A2D; border-color: #FFD338; box-shadow: 0 0 0 3px rgba(255,211,56,0.12); }
+[data-theme="dark"] .btn-top-reset { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .btn-top-reset:hover { background: #4A4A4E; border-color: #6A6E78; color: #E8E8E8; }
+[data-theme="dark"] .btn-top-delete { background: #2A2A2D; border-color: #802020; color: #FF6666; }
+
+/* 스테퍼 UI */
+[data-theme="dark"] .stepper-header { background: #222225; border-color: #545860; }
+[data-theme="dark"] .stepper-circle { background: #545860; color: #999999; border-color: transparent; }
+[data-theme="dark"] .stepper-step.active .stepper-circle { background: #F46600; color: white; box-shadow: 0 0 0 4px rgba(244,102,0,0.18); border-color: #c95800; }
+[data-theme="dark"] .stepper-step.done .stepper-circle { background: #10b981; color: white; border-color: #059669; }
+[data-theme="dark"] .stepper-label { color: #777777; }
+[data-theme="dark"] .stepper-step.active .stepper-label { color: #FFD338; }
+[data-theme="dark"] .stepper-step.done .stepper-label { color: #34d399; }
+[data-theme="dark"] .stepper-line { background: #545860; }
+[data-theme="dark"] .stepper-line.done { background: #10b981; }
+[data-theme="dark"] .stepper-nav { border-top-color: #545860; }
+[data-theme="dark"] .btn-step-back { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .btn-step-back:hover { background: #4A4A4E; color: #E8E8E8; }
+
+/* 단계 블록 */
+[data-theme="dark"] .phase-block { box-shadow: none; border-color: #545860; }
+[data-theme="dark"] .phase-block-header { background: #3F3F42; border-color: #545860; }
+[data-theme="dark"] .phase-block-body { background: #2A2A2D; }
+[data-theme="dark"] .phase-block-body input,
+[data-theme="dark"] .phase-block-body textarea { background: #3F3F42; border-color: #545860; color: #E8E8E8; }
+[data-theme="dark"] .phase-block-body input:focus,
+[data-theme="dark"] .phase-block-body textarea:focus { background: #2A2A2D; border-color: #FFD338; }
+[data-theme="dark"] .phase-block-body .form-group label { color: #999999; }
+
+/* 일괄 등록 */
+[data-theme="dark"] .bulk-toolbar { background: #2A2A2D; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+[data-theme="dark"] .bulk-notice { background: #2A2A2D; border-color: #545860; border-left-color: #FFD338; color: #CCCCCC; }
+[data-theme="dark"] .bulk-notice::before { background: #FFD338; }
+[data-theme="dark"] .bulk-notice .n1 { color: #E8E8E8; }
+[data-theme="dark"] .bulk-notice .n2 { color: #CCCCCC; }
+[data-theme="dark"] .bulk-notice .n3 { color: #CCCCCC; }
+[data-theme="dark"] .bulk-notice .n4 { color: #CCCCCC; }
+[data-theme="dark"] .bulk-scroll { box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+/* 그리드 헤더 */
+[data-theme="dark"] .bulk-grid th { background: #3F3F42; color: #E8E8E8; border-color: #545860; }
+[data-theme="dark"] .bulk-grid th.ph-h1 { background: #3A3200; color: #FFD338; }
+[data-theme="dark"] .bulk-grid th.ph-h2 { background: #3A2800; color: #FFB347; }
+[data-theme="dark"] .bulk-grid th.ph-h3 { background: #3A1800; color: #FF9040; }
+[data-theme="dark"] .bulk-grid th.ph-h4 { background: #2E2822; color: #C0AB96; }
+[data-theme="dark"] .bulk-grid th.ph-h5 { background: #2E2E32; color: #9EA2AC; }
+/* 그리드 셀 */
+[data-theme="dark"] .bulk-grid td { background: #2A2A2D; border-color: #3F3F42; }
+[data-theme="dark"] .bulk-grid tr:nth-child(even) td { background: #252528; }
+[data-theme="dark"] .bulk-grid tr:hover td { background: #35301E; }
+[data-theme="dark"] .bulk-grid tr:hover td.row-num { background: #3A2800; color: #FFB347; }
+[data-theme="dark"] .bulk-grid td input,
+[data-theme="dark"] .bulk-grid td select { color: #E8E8E8; background: transparent; }
+[data-theme="dark"] .bulk-grid td input:focus,
+[data-theme="dark"] .bulk-grid td select:focus { background: #3F3F42; outline-color: #FFD338; }
+[data-theme="dark"] .bulk-grid td.row-num { background: #3F3F42; color: #999999; }
+[data-theme="dark"] .bulk-grid td.row-chk { background: #3F3F42; }
+[data-theme="dark"] .bulk-grid tr.row-checked td { background: #2A1E00 !important; }
+/* sticky 고정 컬럼 */
+[data-theme="dark"] .bulk-grid .col-fix-1 { background: #3F3F42; }
+[data-theme="dark"] .bulk-grid .col-fix-2 { background: #3F3F42; }
+[data-theme="dark"] .bulk-grid .col-fix-3 { background: #2A2A2D; box-shadow: 3px 0 5px -2px rgba(0,0,0,0.4); }
+[data-theme="dark"] .bulk-grid thead th.col-fix-1,
+[data-theme="dark"] .bulk-grid thead th.col-fix-2,
+[data-theme="dark"] .bulk-grid thead th.col-fix-3 { background: #3F3F42; }
+[data-theme="dark"] .bulk-grid tr:nth-child(even) td.col-fix-1,
+[data-theme="dark"] .bulk-grid tr:nth-child(even) td.col-fix-2 { background: #2E2E32; }
+[data-theme="dark"] .bulk-grid tr:nth-child(even) td.col-fix-3 { background: #252528; }
+[data-theme="dark"] .bulk-grid tr:hover td.col-fix-1,
+[data-theme="dark"] .bulk-grid tr:hover td.col-fix-2,
+[data-theme="dark"] .bulk-grid tr:hover td.col-fix-3 { background: #35301E; }
+[data-theme="dark"] .bulk-row-count { color: #999999; }
+
+/* 빈 상태 */
+[data-theme="dark"] .empty-state-icon::before { border-color: #545860; background: #3F3F42; }
+[data-theme="dark"] .empty-state-icon::after { background: #545860; }
+[data-theme="dark"] .empty-state-title { color: #999999; }
+[data-theme="dark"] .empty-state-btn { background: #3F3F42; border-color: #545860; color: #999999; }
+[data-theme="dark"] .empty-state-btn:hover { background: #4A4A4E; }
+
+/* 다크모드 팀 태그 — KB 팔레트 */
+[data-theme="dark"] .color-team-a-light { background-color: #3A1800; color: #FF9040; border-color: #F46600; }
+[data-theme="dark"] .color-team-b-light { background-color: #3A2800; color: #FFB347; border-color: #FD9C26; }
+[data-theme="dark"] .color-team-c-light { background-color: #3A3200; color: #FFD338; border-color: #FFBC00; }
+[data-theme="dark"] .color-team-d-light { background-color: #062E1F; color: #34D399; border-color: #059669; }
+[data-theme="dark"] .color-team-e-light { background-color: #001540; color: #6699FF; border-color: #0066FF; }
+[data-theme="dark"] .color-team-f-light { background-color: #1A0A35; color: #A78BFA; border-color: #7C3AED; }
+
+/* 토스트 */
+[data-theme="dark"] #msgBox { box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+
+/* footer */
+[data-theme="dark"] footer { color: #475569; }
+[data-theme="dark"] .footer-sep { color: #334155; }
+[data-theme="dark"] .footer-meta { color: #475569; }
+[data-theme="dark"] .footer-reset-btn { border-color: #334155; color: #475569; }
+[data-theme="dark"] .footer-reset-btn:hover { border-color: #475569; color: #64748b; }
+
+/* 오픈일 깃발 (다크) */
+[data-theme="dark"] .milestone {
+    color: #c4991a;
+    text-shadow: 0 0 8px rgba(251,191,36,0.55), 0 1px 3px rgba(0,0,0,0.8);
+}
+[data-theme="dark"] .open-beacon-dot { background: #f97316; border-color: #1e293b; box-shadow: 0 0 0 1.5px #f97316, 0 0 8px rgba(249,115,22,0.9); }
+[data-theme="dark"] .open-beacon-ring { background: rgba(251,191,36,0.45); }
+[data-theme="dark"] .open-beacon-ring:nth-child(2) { background: rgba(251,191,36,0.25); }
+
+/* 스크롤바 */
+[data-theme="dark"] ::-webkit-scrollbar-track { background: #1e293b; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #334155; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* 검색 하이라이트 */
+[data-theme="dark"] .search-hl { background: #713f12; color: #fef08a; }
+
+/* ④ prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ── 인쇄 버튼 ── */
+/* 인쇄/PDF — KB DarkBlue Light */
+.io-btn.print-btn {
+    border-color: #545860; color: #3F3F42; background: #EEEFF1;
+    display: inline-flex; align-items: center; gap: 5px;
+}
+.io-btn.print-btn:hover { background: #E3E4E7; border-color: #3F3F42; color: #222222; transform: translateY(-1px); }
+.io-btn.print-btn::before {
+    content: ''; display: inline-block; width: 11px; height: 11px;
+    background: currentColor; flex-shrink: 0;
+    clip-path: polygon(0% 25%, 25% 0%, 100% 0%, 100% 75%, 75% 100%, 0% 100%);
+}
+[data-theme="dark"] .io-btn.print-btn { background: #2E2E32; color: #9EA2AC; border-color: #545860; }
+[data-theme="dark"] .io-btn.print-btn:hover { background: #3C3C40; color: #E8E8E8; border-color: #6A6E78; }
+
+/* ── 인쇄 전용 보고서 헤더 ── */
+.print-report-header { display: none; }

@@ -1,0 +1,106 @@
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.project-card {
+    background: rgba(255,255,255,0.78); border-radius: var(--r-lg); border: 1px solid rgba(255,255,255,0.65);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    padding: 14px 16px 12px; border-left: 4px solid #8fafc3;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.9);
+    transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease; cursor: pointer; display: flex; flex-direction: column; gap: 0;
+    user-select: none;
+}
+.project-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.85); }
+
+/* ── 카드 공통 행 구분선 ── */
+.card-divider { border: none; border-top: 1px dashed #e9ecf0; margin: 6px 0; }
+
+/* ── 상태 뱃지 ── */
+.status-tag {
+    display: inline-block; font-size: 0.63rem; font-weight: 800;
+    padding: 1px 7px; border-radius: var(--r-sm);
+    background: #fef08a; color: #854d0e;
+}
+
+/* ── 카드 단계 행 ── */
+.card-phase-row {
+    display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
+    font-size: 0.72rem; color: #78716c;
+}
+.card-phase-name { font-weight: 800; color: #92400e; }
+.card-phase-date { font-size: 0.67rem; color: #a8a29e; }
+
+/* ── 카드 단계 상세 설명 ── */
+.card-phase-desc {
+    font-size: 0.72rem; color: #71717a; line-height: 1.4;
+}
+
+/* ── 카드 담당 행 ── */
+.card-meta-row {
+    display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center;
+    font-size: 0.72rem;
+}
+.card-meta-item { display: flex; align-items: center; gap: 3px; }
+.card-meta-label {
+    font-size: 0.6rem; font-weight: 800; padding: 1px 5px; border-radius: var(--r-sm);
+    white-space: nowrap; flex-shrink: 0;
+}
+.card-meta-value { font-weight: 700; color: #3d352c; }
+
+/* ── 카드 푸터 메트릭 ── */
+.card-footer-metrics {
+    display: flex; align-items: center; gap: 0;
+    background: #f4efe9; border-radius: var(--r-sm); overflow: hidden;
+    border: 1px solid #e8ecf0; margin-top: 2px;
+}
+.card-metric {
+    flex: 1; padding: 4px 6px; text-align: center;
+    border-right: 1px solid #e8ecf0;
+}
+.card-metric:last-child { border-right: none; }
+.card-metric-label { font-size: 0.57rem; color: #a8a09a; font-weight: 700; letter-spacing: 0.02em; }
+.card-metric-value { font-size: 0.82rem; font-weight: 900; color: #3d352c; margin-top: 1px; }
+.card-metric-unit { font-size: 0.57rem; font-weight: 600; }
+.card-metric.open { background: transparent; }
+.card-metric.open .card-metric-label { color: #a8a09a; }
+.card-metric.open .card-metric-value { color: #1e1710; font-size: 0.75rem; }
+.card-metric.budget .card-metric-value { color: #1e1710; }
+
+#msgBox {
+    position: fixed; top: 20px; right: 20px; padding: 14px 20px; border-radius: var(--r-md);
+    background: #1e293b; color: white; font-weight: bold; z-index: 2000; display: none;
+    box-shadow: 0 10px 15px rgba(0,0,0,0.2);
+    white-space: pre-wrap; max-width: 320px; font-size: 0.84rem; line-height: 1.5;
+    will-change: transform, opacity;
+}
+
+/* ── Gantt 호버 툴팁 ── */
+.gantt-tooltip {
+    position: fixed; z-index: 500; pointer-events: none; display: none;
+    background: #0f172a; color: white; border-radius: var(--r-md);
+    padding: 10px 14px; font-size: 0.78rem; line-height: 1.5;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.15);
+    max-width: 260px; border: 1px solid rgba(255,255,255,0.08);
+}
+.gantt-tooltip.visible { display: block; }
+.gantt-tooltip-name { font-weight: 800; margin-bottom: 3px; }
+.gantt-tooltip-date { font-size: 0.7rem; color: rgba(255,255,255,0.55); }
+.gantt-tooltip-desc { font-size: 0.72rem; color: rgba(255,255,255,0.7); margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 5px; white-space: pre-wrap; }
+
+/* ── Gantt Drag & Drop ── */
+.phase-bar { cursor: grab; }
+.phase-bar.gd-dragging {
+    opacity: 0.72; z-index: 100;
+    transition: none !important;
+    cursor: grabbing !important;
+    clip-path: none !important;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.32);
+}
+.gantt-drag-tip {
+    position: fixed; z-index: 600; pointer-events: none; display: none;
+    background: #1e293b; color: #fff; border-radius: 8px;
+    padding: 5px 12px; font-size: 0.72rem; font-weight: 700;
+    white-space: nowrap; letter-spacing: 0.01em;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.gantt-drag-tip.show { display: block; }
+.gantt-drag-tip em { color: rgba(255,255,255,0.5); font-style: normal; margin: 0 4px; }

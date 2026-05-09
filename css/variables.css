@@ -1,0 +1,31 @@
+:root {
+    /* ── KB 브랜드 컬러 시스템 ── */
+    --bg-color: #F8F8F8;          /* KB BG1 */
+    --text-main: #222222;          /* KB Title */
+    --text-sub: #666666;           /* KB Body */
+    --border-color: #DDDDDD;       /* KB Line */
+    --white: #FFFFFF;              /* KB BG2 */
+    --blue: #0066FF;               /* KB Success */
+    --emerald: #10b981;
+    --indigo: #545860;             /* KB DarkBlue Light */
+    --orange: #F46600;             /* KB Orange */
+    --primary: #F46600;            /* KB Orange — 주요 액션 */
+    --primary-deep: #c95800;       /* KB Orange 강조 */
+    --primary-shadow: rgba(244,102,0,0.22);
+    --accent: #FFD338;             /* KB Yellow Web — 하이라이트 */
+    --red: #FF0000;                /* KB Negative */
+    --gold: #FFBC00;               /* KB Yellow CI */
+    --sidebar-width: 320px;
+
+    /* ── 단계 막대 — KB Yellow→Orange→Gold 계열 ── */
+    --phase-1: #FFD338;            /* KB Yellow Web */
+    --phase-2: #FFBC00;            /* KB Yellow CI */
+    --phase-3: #FD9C26;            /* KB Orange Light */
+    --phase-4: #F46600;            /* KB Orange */
+    --phase-5: #7D6C59;            /* KB Gold */
+
+    --chart-text: #222222;         /* KB Title */
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+}
