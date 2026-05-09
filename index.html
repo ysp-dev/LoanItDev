@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="css/list.css">
     <link rel="stylesheet" href="css/dark.css">
     <link rel="stylesheet" href="css/responsive.css">
-    <link rel="stylesheet" href="css/print.css">
     <link rel="stylesheet" href="css/ie.css">
 </head>
 <body>
@@ -111,26 +110,12 @@
                     병합 가져오기
                 </button>
                 <div class="io-toolbar-divider"></div>
-                <button class="io-btn print-btn" onclick="printReport()" title="현재 대시보드를 PDF 보고서로 인쇄합니다">인쇄 / PDF</button>
-                <div class="io-toolbar-divider"></div>
                 <span class="io-info" id="io-last-saved">- 저장 정보 로딩 중...</span>
             </div>
             <!-- 파일 입력 (숨김) -->
             <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event, false)">
             <input type="file" id="merge-file-input"  accept=".json" style="display:none" onchange="handleImportFile(event, true)">
 
-            <!-- 인쇄 전용 보고서 헤더 (화면에서는 숨김) -->
-            <div class="print-report-header">
-                <div>
-                    <div class="print-report-org">Loan IT Dev Dept.</div>
-                    <h1 class="print-report-title" id="print-report-title-text">2026 여신IT개발부 주요 프로젝트 현황</h1>
-                    <div class="print-report-sub" id="print-report-sub-text">Loan IT Dept. Roadmap 2026</div>
-                </div>
-                <div class="print-report-meta">
-                    <div><span class="print-report-badge">CONFIDENTIAL</span></div>
-                    <div>출력일시: <strong id="print-date-text">-</strong></div>
-                </div>
-            </div>
 
             <div class="stats-grid">
                 <div class="stat-card sc-total">
@@ -139,15 +124,15 @@
                 </div>
                 <div class="stat-card sc-ongoing">
                     <div class="label">진행중</div>
-                    <div class="value" id="stat-ongoing" style="color: var(--blue);">0건</div>
+                    <div class="value" id="stat-ongoing">0건</div>
                 </div>
                 <div class="stat-card sc-done">
                     <div class="label">완료</div>
-                    <div class="value" id="stat-done" style="color: var(--emerald);">0건</div>
+                    <div class="value" id="stat-done">0건</div>
                 </div>
                 <div class="stat-card sc-early">
                     <div class="label">상반기 완료 예정</div>
-                    <div class="value" id="stat-early-open" style="color: var(--emerald);">0건</div>
+                    <div class="value" id="stat-early-open">0건</div>
                 </div>
             </div>
 
@@ -342,7 +327,7 @@
         <footer>
             <span id="footer-year"></span>&nbsp;Loan IT Dev Dept.
             <span class="footer-sep">|</span>
-            <span class="footer-meta">Crafted by Brian PARK &middot; Powered by Claude Code &amp; Gemini</span>
+            <span class="footer-meta">Crafted by Brian Park &middot; Powered by Claude Code &amp; Gemini</span>
             <span class="footer-sep">|</span>
             <span class="footer-meta">Optimized for Chrome &amp; Edge</span>
             <span class="footer-sep">|</span>
