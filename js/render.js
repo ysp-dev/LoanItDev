@@ -267,8 +267,8 @@ function renderDashboard() {
             <hr class="card-divider">
             <div class="card-meta-row">
                 <span class="card-meta-item">
-                    <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">팀</span>
-                    <span class="card-meta-value">${hl(p.team, q)}${p.part ? ' / ' + hl(p.part, q) : ''}</span>
+                    <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">파트</span>
+                    <span class="card-meta-value">${p.part ? hl(p.part, q) : hl(p.team, q)}</span>
                 </span>
                 <span class="card-meta-item">
                     <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">담당자</span>
