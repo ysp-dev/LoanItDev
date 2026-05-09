@@ -60,7 +60,7 @@
 .card-metric-unit { font-size: 0.57rem; font-weight: 600; }
 .card-metric.open { background: transparent; }
 .card-metric.open .card-metric-label { color: #a8a09a; }
-.card-metric.open .card-metric-value { color: #1e1710; font-size: 0.75rem; }
+.card-metric.open .card-metric-value { color: #b45309; font-size: 0.75rem; }
 .card-metric.budget .card-metric-value { color: #1e1710; }
 
 #msgBox {
