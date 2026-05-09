@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="renderer" content="webkit">
+    <meta name="force-rendering" content="webkit">
+    <title>2026 여신IT개발부 주요 프로젝트 현황</title>
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/gantt.css">
+    <link rel="stylesheet" href="css/cards.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/list.css">
+    <link rel="stylesheet" href="css/dark.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/ie.css">
+</head>
+<body>
+    <div id="ie-overlay" style="display:none;">
+        <div class="ie-box">
+            <div class="ie-icon">🔷</div>
+            <div class="ie-title">Microsoft Edge를 사용해 주세요</div>
+            <div class="ie-desc">
+                현재 접속하신 <strong>Internet Explorer</strong>는 지원이 종료된 브라우저로,<br>
+                이 대시보드가 정상적으로 동작하지 않을 수 있습니다.<br><br>
+                <span id="ie-countdown" style="font-size:1.6rem;font-weight:700;color:#60a5fa;">3</span>초 후 <strong>Microsoft Edge</strong>로 자동 이동하며 IE 창이 닫힙니다.
+            </div>
+            <button class="ie-btn-edge" onclick="window.open('microsoft-edge:'+location.href,'_blank');setTimeout(function(){window.close();},500);">
+                &#x2726; Edge로 열기
+            </button>
+            <div class="ie-note">Edge가 설치되어 있지 않다면 <a href="https://www.microsoft.com/ko-kr/edge" style="color:#60a5fa;">여기서 다운로드</a>하세요.</div>
+        </div>
+    </div>
+    <script src="js/ie.js"></script>
+
+    <div id="msgBox"></div>
+    <div id="ganttTooltip" class="gantt-tooltip"></div>
+    <div id="ganttDragTip" class="gantt-drag-tip"></div>
+    <svg id="depDefs" style="position:absolute;width:0;height:0;overflow:hidden;">
+        <defs>
+            <marker id="depArrowMarker" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <path d="M0,1 L6,3.5 L0,6 Z" fill="rgba(100,116,139,0.85)"/>
+            </marker>
+        </defs>
+    </svg>
+
+    <!-- Cmd+K 커맨드 팔레트 -->
+    <div id="cmdPalOverlay" class="cmdpal-overlay" onclick="if(event.target===this)closeCmdPal()">
+        <div class="cmdpal-box">
+            <div class="cmdpal-input-wrap">
+                <span class="cmdpal-icon cmdpal-search-icon"></span>
+                <input id="cmdPalInput" class="cmdpal-input" type="text" placeholder="프로젝트 검색 또는 명령어 입력..." autocomplete="off" oninput="updateCmdPal()" onkeydown="cmdPalKeyDown(event)">
+                <span class="cmdpal-kbd">ESC</span>
+            </div>
+            <div id="cmdPalResults" class="cmdpal-results"></div>
+            <div class="cmdpal-footer">
+                <span class="cmdpal-footer-hint"><span class="cmdpal-kbd">↑↓</span> 탐색</span>
+                <span class="cmdpal-footer-hint"><span class="cmdpal-kbd">Enter</span> 열기</span>
+                <span class="cmdpal-footer-hint"><span class="cmdpal-kbd">⌘K</span> 토글</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="nav-tabs">
+            <div id="tabDash" class="nav-tab active" onclick="switchView('dashboard')">대시보드</div>
+            <div id="tabAdmin" class="nav-tab" onclick="switchView('admin')">프로젝트 추가</div>
+            <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()">
+                <span class="theme-toggle-icon"></span>
+                <span id="theme-toggle-label">다크모드</span>
+            </button>
+        </div>
+
+        <div id="dashboardView">
+            <header>
+                <div class="header-title">
+                    <div id="header-sub-tag" class="sub-tag">Loan IT Dept. Roadmap 2026</div>
+                    <h1 id="header-title">2026 여신IT개발부 주요 프로젝트 현황</h1>
+                    <div id="filter-container" class="filter-group" style="margin-top:8px;"></div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px;">
+                    <div class="live-clock-container">
+                        <span id="live-date" class="clock-date">2026년 00월 00일 (요일)</span>
+                        <span class="clock-sep"></span>
+                        <div class="clock-time">
+                            <span class="clock-live-dot"></span>
+                            <span id="live-time">00:00</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:5px;align-items:center;">
+                        <input class="search-input" type="search" id="search-input" placeholder="통합 검색 (프로젝트명·담당자·팀·단계설명)..." onkeydown="if(event.key==='Enter')setSearch(this.value)" style="width:210px;">
+                        <button class="search-btn" onclick="setSearch(document.getElementById('search-input').value)">검색</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 내보내기/가져오기 툴바 -->
+            <div class="io-toolbar">
+                <span class="io-toolbar-label">DATA</span>
+                <button class="io-btn export" onclick="exportProjects()" title="현재 프로젝트 데이터를 JSON 파일로 저장합니다">
+                    내보내기
+                </button>
+                <button class="io-btn import" onclick="document.getElementById('import-file-input').click()" title="JSON 파일을 불러와 현재 데이터를 덮어씁니다">
+                    가져오기
+                </button>
+                <button class="io-btn merge" onclick="document.getElementById('merge-file-input').click()" title="JSON 파일을 불러와 기존 데이터에 병합합니다 (중복 제외)">
+                    병합 가져오기
+                </button>
+                <div class="io-toolbar-divider"></div>
+                <span class="io-info" id="io-last-saved">- 저장 정보 로딩 중...</span>
+            </div>
+            <!-- 파일 입력 (숨김) -->
+            <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event, false)">
+            <input type="file" id="merge-file-input"  accept=".json" style="display:none" onchange="handleImportFile(event, true)">
+
+
+            <div class="stats-grid">
+                <div class="stat-card sc-total">
+                    <div class="label">주요 프로젝트</div>
+                    <div class="value" id="stat-count">0건</div>
+                </div>
+                <div class="stat-card sc-ongoing">
+                    <div class="label">진행중</div>
+                    <div class="value" id="stat-ongoing">0건</div>
+                </div>
+                <div class="stat-card sc-done">
+                    <div class="label">완료</div>
+                    <div class="value" id="stat-done">0건</div>
+                </div>
+                <div class="stat-card sc-early">
+                    <div class="label">상반기 완료 예정</div>
+                    <div class="value" id="stat-early-open">0건</div>
+                </div>
+            </div>
+
+            <div class="gantt-container">
+                <div class="gantt-header">
+                    <h2>프로젝트 로드맵</h2>
+                    <span class="gantt-drag-hint">막대를 드래그해 일정 변경 · 좌우 끝을 늘리거나 줄여 기간 조정</span>
+                    <button class="btn-compact" id="btn-compact" onclick="toggleCompact()">컴팩트</button>
+                </div>
+                <div class="gantt-scroll">
+                    <div class="gantt-content">
+                        <div class="timeline-header">
+                            <div></div>
+                            <div id="month-header" class="month-grid"></div>
+                        </div>
+                        <div id="gantt-rows"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <h2 class="section-header-title">프로젝트 상세</h2>
+                <span id="detail-count" class="section-header-count"></span>
+                <div class="detail-controls">
+                    <button class="view-btn active" id="btn-view-card" onclick="setView('card')">카드뷰</button>
+                    <button class="view-btn" id="btn-view-list" onclick="setView('list')">목록뷰</button>
+                    <span style="width:1px;height:16px;background:#dde3ea;display:inline-block;margin:0 2px;"></span>
+                    <button class="excel-btn" onclick="exportExcel()">엑셀 내보내기</button>
+                    <button class="excel-btn" id="btn-delete-selected" onclick="deleteSelected()" style="display:none;background:#fee2e2;color:#b91c1c;border-color:#fca5a5;">선택 삭제</button>
+                    <div class="col-panel-wrap" id="col-panel-wrap" style="display:none;">
+                        <button class="btn-col-toggle" onclick="toggleColPanel()">컬럼</button>
+                        <div class="col-panel" id="col-panel"></div>
+                    </div>
+                </div>
+                <div class="section-header-divider"></div>
+                <span class="edit-hint">더블클릭하면 수정할 수 있습니다</span>
+            </div>
+            <div id="card-grid" class="card-grid"></div>
+            <div id="list-view" class="list-view" style="display:none;"></div>
+        </div>
+
+        <div id="adminView" class="input-section">
+            <!-- 서브탭 -->
+            <div class="admin-tabs">
+                <button class="admin-tab-btn active" id="adminTabSingle" onclick="switchAdminTab('single')">단건 등록</button>
+                <button class="admin-tab-btn" id="adminTabBulk" onclick="switchAdminTab('bulk')">일괄 등록 <small style="font-weight:400;">(최대 20건)</small></button>
+            </div>
+
+            <!-- 단건 등록 패널 -->
+            <div id="adminSingle">
+                <!-- 폼 제목 -->
+                <div class="form-section-title">
+                    <div class="title-left">
+                        <h2 id="form-title">신규 프로젝트 등록</h2>
+                        <span id="form-mode-badge" class="form-mode-badge" style="display:none;"></span>
+                    </div>
+                    <div class="title-right">
+                        <button class="btn-top-delete" id="btn-delete" onclick="deleteProject()">프로젝트 삭제</button>
+                        <div class="btn-top-sep" id="btn-top-sep"></div>
+                        <button class="btn-top-reset" id="btn-top-reset" onclick="handleResetOrCancel()">전체 항목 초기화</button>
+                        <button class="btn-top-save" id="btn-submit" onclick="saveNewProject()">등록 및 로드맵 반영</button>
+                    </div>
+                </div>
+
+                <!-- Stepper 헤더 -->
+                <div class="stepper-header">
+                    <div class="stepper-step active" id="stepper-step-1">
+                        <div class="stepper-circle">1</div>
+                        <div class="stepper-label">기본정보</div>
+                    </div>
+                    <div class="stepper-line" id="stepper-line-1"></div>
+                    <div class="stepper-step" id="stepper-step-2">
+                        <div class="stepper-circle">2</div>
+                        <div class="stepper-label">세부일정</div>
+                    </div>
+                </div>
+
+                <!-- Step 1: 기본정보 -->
+                <div class="stepper-panel active" id="step-panel-1">
+                    <div class="form-block">
+                        <div class="form-block-label">기본 정보</div>
+                        <div class="form-grid">
+                            <div class="form-group req">
+                                <label>프로젝트명</label>
+                                <input type="text" id="in-name" placeholder="프로젝트명을 입력하세요" maxlength="60">
+                            </div>
+                            <div class="form-group req">
+                                <label>담당 팀</label>
+                                <select id="in-team">
+                                    <option value="">-- 팀을 선택하세요 --</option>
+                                    <option value="여신심사팀">여신심사팀</option>
+                                    <option value="여신업무팀">여신업무팀</option>
+                                    <option value="여신관리팀">여신관리팀</option>
+                                    <option value="상품/신용평가팀">상품/신용평가팀</option>
+                                    <option value="외환팀">외환팀</option>
+                                    <option value="PPR팀">PPR팀</option>
+                                </select>
+                            </div>
+                            <div class="form-group req">
+                                <label>담당 파트</label>
+                                <input type="text" id="in-part" placeholder="파트명을 입력하세요" maxlength="30">
+                            </div>
+                            <div class="form-group req">
+                                <label>담당자</label>
+                                <input type="text" id="in-pm" placeholder="담당자 성명을 입력하세요" maxlength="20">
+                            </div>
+                            <div class="form-group req">
+                                <label>의뢰부서명</label>
+                                <input type="text" id="in-client-dept" placeholder="예: 개인여신부" maxlength="40">
+                            </div>
+                            <div class="form-group req">
+                                <label>적용예정일</label>
+                                <div class="date-wrap ph-show">
+                                    <input type="date" id="in-open" min="2000-01-01" max="2099-12-31" onchange="validateSingleDate(this)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stepper-nav">
+                        <div></div>
+                        <button class="btn-step-next" onclick="if(validateStep(1)) goStep(2)">세부일정 입력 →</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: 세부일정 -->
+                <div class="stepper-panel" id="step-panel-2">
+                    <div class="form-block">
+                        <div class="form-block-label">단계별 상세 내용</div>
+                        <div id="phase-inputs-container"></div>
+                    </div>
+                    <div class="stepper-nav">
+                        <button class="btn-step-back" onclick="goStep(1)">← 기본정보</button>
+                        <button class="btn-step-next" onclick="if(validateStep(2)) saveNewProject()">✓ 등록 및 로드맵 반영</button>
+                    </div>
+                </div>
+
+
+            </div>
+
+            <!-- 일괄 등록 패널 -->
+            <div id="adminBulk" style="display:none;">
+                <div class="bulk-mobile-notice" style="display:none;">일괄 등록은 넓은 화면(PC)에서 사용하시길 권장합니다.</div>
+                <div class="bulk-toolbar">
+                    <button class="btn-bulk add" onclick="addBulkRow()">행 추가</button>
+                    <button class="btn-bulk del" onclick="deleteBulkRows()">행 삭제</button>
+                    <span id="bulk-row-count" style="font-size:0.72rem;font-weight:700;color:#94a3b8;padding:0 2px;">1 / 20</span>
+                    <div class="bulk-toolbar-sep"></div>
+                    <label class="btn-bulk import" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                        <input type="file" accept=".csv" style="display:none;" onchange="importBulkCSV(event)">
+                        CSV 가져오기
+                    </label>
+                    <button class="btn-bulk tmpl" onclick="downloadBulkTemplate()">CSV 템플릿</button>
+                    <div class="bulk-toolbar-sep"></div>
+                    <button class="btn-bulk save" onclick="saveBulk()">등록</button>
+                    <button class="btn-bulk reset" onclick="clearBulkGrid()">초기화</button>
+                </div>
+                <div class="bulk-notice">
+                    <span class="n1">프로젝트명이 입력된 행만 등록됩니다</span> &nbsp;·&nbsp; <span class="n2">프로젝트명이 동일한 경우 중복 등록이 제한됩니다</span> &nbsp;·&nbsp; <span class="n3">신규 작성 시 <b>CSV 템플릿</b> 버튼으로 양식을 먼저 다운로드하세요</span>                </div>
+                <div id="bulk-error-panel" class="bulk-error-panel" style="display:none;"></div>
+                <div class="bulk-scroll">
+                    <table class="bulk-grid">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" class="col-fix-1" style="width:28px;"><input type="checkbox" id="bulk-chk-all" title="전체 선택/해제" onchange="toggleAllBulkChk(this.checked)"></th>
+                                <th rowspan="2" class="col-fix-2">No</th>
+                                <th rowspan="2" class="col-fix-3" style="min-width:130px;">프로젝트명</th>
+                                <th rowspan="2" style="min-width:100px;">담당팀</th>
+                                <th rowspan="2" style="min-width:80px;">담당파트</th>
+                                <th rowspan="2" style="min-width:60px;">담당자</th>
+                                <th rowspan="2" style="min-width:72px;">의뢰부서</th>
+                                <th rowspan="2" style="min-width:90px;">적용예정일</th>
+                                <th colspan="4" class="ph-h1">1단계</th>
+                                <th colspan="4" class="ph-h2">2단계</th>
+                                <th colspan="4" class="ph-h3">3단계</th>
+                                <th colspan="4" class="ph-h4">4단계</th>
+                                <th colspan="4" class="ph-h5">5단계</th>
+                            </tr>
+                            <tr>
+                                <th class="ph-h1" style="min-width:66px;">단계명</th><th class="ph-h1" style="min-width:86px;">시작일</th><th class="ph-h1" style="min-width:86px;">종료일</th><th class="ph-h1" style="min-width:100px;">설명</th>
+                                <th class="ph-h2" style="min-width:66px;">단계명</th><th class="ph-h2" style="min-width:86px;">시작일</th><th class="ph-h2" style="min-width:86px;">종료일</th><th class="ph-h2" style="min-width:100px;">설명</th>
+                                <th class="ph-h3" style="min-width:66px;">단계명</th><th class="ph-h3" style="min-width:86px;">시작일</th><th class="ph-h3" style="min-width:86px;">종료일</th><th class="ph-h3" style="min-width:100px;">설명</th>
+                                <th class="ph-h4" style="min-width:66px;">단계명</th><th class="ph-h4" style="min-width:86px;">시작일</th><th class="ph-h4" style="min-width:86px;">종료일</th><th class="ph-h4" style="min-width:100px;">설명</th>
+                                <th class="ph-h5" style="min-width:66px;">단계명</th><th class="ph-h5" style="min-width:86px;">시작일</th><th class="ph-h5" style="min-width:86px;">종료일</th><th class="ph-h5" style="min-width:100px;">설명</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulk-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <span id="footer-year"></span>&nbsp;Loan IT Dev Dept.
+            <span class="footer-sep">|</span>
+            <span class="footer-meta">Crafted by Brian Park &middot; Powered by Claude Code &amp; Gemini</span>
+            <span class="footer-sep">|</span>
+            <span class="footer-meta">Optimized for Chrome &amp; Edge</span>
+            <span class="footer-sep">|</span>
+            <button class="footer-reset-btn" onclick="resetAllData()" title="저장된 모든 데이터를 삭제합니다">대시보드 초기화</button>
+        </footer>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/forms.js"></script>
+    <script src="js/bulk.js"></script>
+    <script src="js/excel.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/init.js"></script>
+</body>
+</html>
