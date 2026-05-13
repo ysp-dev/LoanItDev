@@ -1,3 +1,99 @@
+function _updateDepCountBadge() {
+    const badge = document.getElementById('dep-count-badge');
+    if (!badge) return;
+    const count = document.querySelectorAll('#dep-picker .dep-chk:checked').length;
+    if (count > 0) {
+        badge.textContent = `${count}개 선택됨`;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function _populateDepSelect(excludeId) {
+    const picker = document.getElementById('dep-picker');
+    if (!picker) return;
+
+    const others = AppState.projects.filter(p => p.id !== excludeId);
+    if (!others.length) {
+        picker.innerHTML = '<div class="dep-picker-empty">등록된 다른 프로젝트가 없습니다</div>';
+        _updateDepCountBadge();
+        return;
+    }
+
+    picker.innerHTML = others.map(p => {
+        const styles = getStyleSet(p.team);
+        const lastEnd = p.phaseDetails?.at(-1)?.end || p.open || '';
+        const endStr  = lastEnd ? ` <em>${fmtD(lastEnd)} 완료</em>` : '';
+        return `<label class="dep-item" data-proj-id="${p.id}" style="--dep-color:${styles.hex}">
+            <input type="checkbox" class="dep-chk" value="${p.id}">
+            <span class="dep-item-check">✓</span>
+            <span class="dep-item-team" style="background:${styles.hex}22;color:${styles.hex};">${p.team}</span>
+            <span class="dep-item-name">${p.name}${endStr}</span>
+        </label>`;
+    }).join('');
+
+    picker.querySelectorAll('.dep-chk').forEach(chk => {
+        chk.addEventListener('change', () => {
+            chk.closest('.dep-item').classList.toggle('selected', chk.checked);
+            _updateDepCountBadge();
+        });
+    });
+    _updateDepCountBadge();
+}
+
+function getSelectedDeps() {
+    return [...document.querySelectorAll('#dep-picker .dep-chk:checked')]
+        .map(chk => parseInt(chk.value));
+}
+
+function initTagInput() {
+    const wrap = document.getElementById('tag-input-wrap');
+    if (!wrap || wrap.children.length > 0) return;
+    wrap.innerHTML = PRESET_TAGS.map(tag =>
+        `<button type="button" class="tag-pill" data-tag="${tag.id}"
+            style="background:${tag.bg};color:${tag.fg};border-color:${tag.bg}"
+            onclick="toggleTagPill(this,'${tag.id}')">${tag.label}</button>`
+    ).join('');
+}
+
+function toggleTagPill(btn, tagId) {
+    const tag = PRESET_TAGS.find(t => t.id === tagId);
+    if (!tag) return;
+    btn.classList.toggle('selected');
+    if (btn.classList.contains('selected')) {
+        btn.style.background = tag.fg;
+        btn.style.color = 'white';
+        btn.style.borderColor = tag.fg;
+    } else {
+        btn.style.background = tag.bg;
+        btn.style.color = tag.fg;
+        btn.style.borderColor = tag.bg;
+    }
+}
+
+function getSelectedTags() {
+    return [...document.querySelectorAll('.tag-pill.selected')].map(b => b.dataset.tag);
+}
+
+function setSelectedTags(tagIds) {
+    document.querySelectorAll('.tag-pill').forEach(btn => {
+        const tag = PRESET_TAGS.find(t => t.id === btn.dataset.tag);
+        if (!tag) return;
+        if (tagIds?.includes(btn.dataset.tag)) {
+            btn.classList.add('selected');
+            btn.style.background = tag.fg;
+            btn.style.color = 'white';
+            btn.style.borderColor = tag.fg;
+        } else {
+            btn.classList.remove('selected');
+            btn.style.background = tag.bg;
+            btn.style.color = tag.fg;
+            btn.style.borderColor = tag.bg;
+        }
+    });
+}
+
 function cascadePhases(proj, fromIdx) {
     const phases = proj.phaseDetails;
     for (let i = fromIdx + 1; i < phases.length; i++) {
@@ -107,8 +203,8 @@ function initPhaseInputs() {
                 </div>
                 <div class="phase-block-body">
                     <div class="form-group${req}"><label>단계명</label><input type="text" id="ph-name-${i}" placeholder="예: ${PH_NAMES[i-1]}"></div>
-                    <div class="form-group${req}"><label>시작일</label><div class="date-wrap ph-show"><input type="date" id="ph-start-${i}" min="2000-01-01" max="2099-12-31" onchange="validatePhaseFlow(${i}, 'start')"></div></div>
-                    <div class="form-group${req}"><label>종료일</label><div class="date-wrap ph-show"><input type="date" id="ph-end-${i}" min="2000-01-01" max="2099-12-31" onchange="validatePhaseFlow(${i}, 'end')"></div></div>
+                    <div class="form-group${req}"><label>시작일</label><div class="date-wrap ph-show"><input type="date" id="ph-start-${i}" min="2000-01-01" max="2099-12-31" autocomplete="off" onchange="validatePhaseFlow(${i}, 'start')"></div></div>
+                    <div class="form-group${req}"><label>종료일</label><div class="date-wrap ph-show"><input type="date" id="ph-end-${i}" min="2000-01-01" max="2099-12-31" autocomplete="off" onchange="validatePhaseFlow(${i}, 'end')"></div></div>
                     <div class="form-group${req}"><label>상세 추진 내용</label><textarea id="ph-desc-${i}" rows="2" placeholder="추진 내용을 요약하세요"></textarea></div>
                 </div>
             </div>
@@ -172,7 +268,7 @@ function validateStep(n) {
 }
 
 function handleResetOrCancel() {
-    if (editingProjectId) {
+    if (AppState.editingProjectId) {
         cancelEdit();
     } else {
         resetForm();
@@ -180,7 +276,8 @@ function handleResetOrCancel() {
 }
 
 function cancelEdit() {
-    editingProjectId = null;
+    if (typeof unlockProject === 'function') unlockProject(AppState.editingProjectId);
+    AppState.editingProjectId = null;
     switchView('dashboard');
 }
 
@@ -199,28 +296,48 @@ function resetForm(silent = false) {
             document.getElementById(`ph-desc-${i}`).value = '';
         }
     }
+    setSelectedTags([]);
+    _populateDepSelect(AppState.editingProjectId);
+    AppState.formDirty = false;
     syncDateWraps();
     goStep(1);
+    // Safari form state restoration 차단: defaultValue까지 초기화
+    // 수정 모드에서는 editProject()가 날짜값을 채우므로 건너뜀
+    setTimeout(() => {
+        if (AppState.editingProjectId) return;
+        document.querySelectorAll('#adminSingle input[type="date"]').forEach(el => {
+            el.value = ''; el.defaultValue = '';
+        });
+        syncDateWraps();
+    }, 0);
     if(!silent) showMsg('모든 항목이 초기화되었습니다.');
 }
 
 function deleteProject() {
-    if (!editingProjectId) return;
-    const p = projects.find(item => item.id === editingProjectId);
+    if (!AppState.editingProjectId) return;
+    const p = AppState.projects.find(item => item.id === AppState.editingProjectId);
     if (!p) return;
     if (!confirm(`'${p.name}' 프로젝트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
-    projects = projects.filter(item => item.id !== editingProjectId);
+    saveHistory(`'${p.name}' 삭제`);
+    if (typeof unlockProject === 'function') unlockProject(AppState.editingProjectId);
+    AppState.projects = AppState.projects.filter(item => item.id !== AppState.editingProjectId);
     saveToStorage();
-    editingProjectId = null;
+    AppState.editingProjectId = null;
     switchView('dashboard');
     renderDashboard();
     showMsg(`'${p.name}' 프로젝트가 삭제되었습니다.`);
 }
 
 function editProject(id) {
-    const p = projects.find(item => item.id === id);
+    const p = AppState.projects.find(item => item.id === id);
     if (!p) return;
-    editingProjectId = id;
+    if (typeof isProjectLocked === 'function' && isProjectLocked(id)) {
+        const info = _lockedProjects.get(id);
+        showMsg(`'${info?.userName || '다른 사용자'}'이(가) 편집 중입니다.`, 'warn');
+        return;
+    }
+    AppState.editingProjectId = id;
+    if (typeof lockProject === 'function') lockProject(id, '나');
     switchView('admin', true);
     resetForm(true);
 
@@ -231,6 +348,7 @@ function editProject(id) {
     document.getElementById('btn-delete').style.display = 'inline-block';
     document.getElementById('btn-top-sep').classList.add('visible');
     document.getElementById('btn-top-reset').innerText = '수정 취소';
+    document.getElementById('btn-step2-submit').style.display = 'none';
 
     document.getElementById('in-name').value = p.name;
     document.getElementById('in-team').value = p.team;
@@ -238,6 +356,12 @@ function editProject(id) {
     document.getElementById('in-pm').value = p.pm;
     document.getElementById('in-client-dept').value = p.clientDept || '';
     document.getElementById('in-open').value = p.open;
+    setSelectedTags(p.tags || []);
+    (p.deps || []).forEach(depId => {
+        const chk = document.querySelector(`#dep-picker .dep-chk[value="${depId}"]`);
+        if (chk) { chk.checked = true; chk.closest('.dep-item').classList.add('selected'); }
+    });
+    _updateDepCountBadge();
 
     p.phaseDetails.forEach((pd, idx) => {
         const i = idx + 1;
@@ -268,10 +392,11 @@ function saveNewProject() {
     if (!openVal) { showMsg('적용예정일을 입력해 주세요.', 'warn'); document.getElementById('in-open').focus(); return; }
     const openDateObj = new Date(openVal);
     const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
-    if (openDateObj < todayMidnight) { showMsg('적용예정일이 오늘 이전입니다.\n오픈 예정일을 확인해 주세요.', 'warn'); document.getElementById('in-open').focus(); return; }
+    // 수정 모드에서는 완료 프로젝트 소급 수정을 허용 (과거 날짜 OK)
+    if (!AppState.editingProjectId && openDateObj < todayMidnight) { showMsg('적용예정일이 오늘 이전입니다.\n오픈 예정일을 확인해 주세요.', 'warn'); document.getElementById('in-open').focus(); return; }
 
     // ── 5. 중복 프로젝트명 체크 ─────────────────────
-    const isDuplicate = projects.some(p => p.name === name && p.id !== editingProjectId);
+    const isDuplicate = AppState.projects.some(p => p.name === name && p.id !== AppState.editingProjectId);
     if (isDuplicate) {
         showMsg(`'${name}' 프로젝트가 이미 존재합니다.\n다른 프로젝트명을 사용해 주세요.`, 'warn');
         document.getElementById('in-name').focus(); return;
@@ -331,18 +456,23 @@ function saveNewProject() {
     }
 
     // ── 8. 저장 처리 ────────────────────────────────
-    const projectData = { id: editingProjectId || Date.now(), team, part, pm, clientDept, name, open: openVal, phaseDetails };
+    const tags = getSelectedTags();
+    const deps = getSelectedDeps();
+    const projectData = { id: AppState.editingProjectId || Date.now(), team, part, pm, clientDept, name, open: openVal, phaseDetails, tags, deps };
 
-    if (editingProjectId) {
-        const index = projects.findIndex(p => p.id === editingProjectId);
-        projects[index] = projectData;
+    if (AppState.editingProjectId) {
+        saveHistory(`'${name}' 수정 전`);
+        const index = AppState.projects.findIndex(p => p.id === AppState.editingProjectId);
+        AppState.projects[index] = projectData;
     } else {
-        projects.push(projectData);
+        AppState.projects.push(projectData);
     }
 
+    AppState.formDirty = false;
+    if (typeof unlockProject === 'function') unlockProject(AppState.editingProjectId);
     saveToStorage();
-    showMsg(editingProjectId ? `'${name}' 프로젝트가 수정되었습니다.` : `'${name}' 프로젝트가 등록되었습니다.`);
-    editingProjectId = null;
+    showMsg(AppState.editingProjectId ? `'${name}' 프로젝트가 수정되었습니다.` : `'${name}' 프로젝트가 등록되었습니다.`);
+    AppState.editingProjectId = null;
     renderDashboard();
     switchView('dashboard');
 }

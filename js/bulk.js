@@ -45,8 +45,8 @@ function makeBulkRow(rid) {
     tr.id = `bulk-tr-${rid}`;
     const phaseCols = [1,2,3,4,5].map(p =>
         `<td><input type="text" id="bg-p${p}n-${rid}" placeholder="${PH_NAMES[p-1]}" maxlength="30"></td>
-         <td><input type="date" id="bg-p${p}s-${rid}" min="2000-01-01" max="2099-12-31"></td>
-         <td><input type="date" id="bg-p${p}e-${rid}" min="2000-01-01" max="2099-12-31"></td>
+         <td><input type="date" id="bg-p${p}s-${rid}" value="" min="2000-01-01" max="2099-12-31" autocomplete="off"></td>
+         <td><input type="date" id="bg-p${p}e-${rid}" value="" min="2000-01-01" max="2099-12-31" autocomplete="off"></td>
          <td><input type="text" id="bg-p${p}d-${rid}" placeholder="설명" maxlength="100"></td>`
     ).join('');
     tr.innerHTML = `
@@ -57,8 +57,10 @@ function makeBulkRow(rid) {
         <td><input type="text" id="bg-part-${rid}" placeholder="파트명" maxlength="30"></td>
         <td><input type="text" id="bg-pm-${rid}" placeholder="담당자" maxlength="20"></td>
         <td><input type="text" id="bg-client-${rid}" placeholder="의뢰부서" maxlength="40"></td>
-        <td><input type="date" id="bg-open-${rid}" min="2000-01-01" max="2099-12-31"></td>
+        <td><input type="date" id="bg-open-${rid}" value="" min="2000-01-01" max="2099-12-31" autocomplete="off"></td>
+        <td><input type="text" id="bg-tags-${rid}" placeholder="긴급,신규…" maxlength="80" title="${PRESET_TAGS.map(t=>t.label).join(', ')} — 쉼표로 구분"></td>
         ${phaseCols}`;
+    tr.querySelectorAll('input[type="date"]').forEach(el => { el.value = ''; el.defaultValue = ''; });
     return tr;
 }
 
@@ -74,7 +76,7 @@ function updateBulkMeta() {
 function initBulkGrid() {
     if (bulkGridInited) return;
     bulkGridInited = true;
-    bulkRidSeq = 0; bulkRids = [];
+    bulkRids = [];
     document.getElementById('bulk-tbody').innerHTML = '';
     addBulkRow();
 }
@@ -121,7 +123,7 @@ function toggleAllBulkChk(checked) {
 
 function clearBulkGrid() {
     if (!confirm('일괄 입력 내용을 초기화하시겠습니까?\n(빈 1행만 남습니다)')) return;
-    bulkRids = []; bulkRidSeq = 0;
+    bulkRids = [];
     document.getElementById('bulk-tbody').innerHTML = '';
     const allChk = document.getElementById('bulk-chk-all');
     if (allChk) allChk.checked = false;
@@ -160,9 +162,15 @@ function saveBulk() {
             }
         }
         if (phaseDetails.length === 0) { errors.push(`${rowNum}행 [${name}]: 단계 정보가 없습니다. (단계명·시작일·종료일 모두 필요)`); continue; }
-        const isDup = projects.some(pr => pr.name === name);
+        const isDup = AppState.projects.some(pr => pr.name === name);
         if (isDup) { errors.push(`${rowNum}행 [${name}]: 동일한 프로젝트명이 이미 등록되어 있습니다.`); continue; }
-        projects.push({ id: Date.now() + r, team, part, pm, clientDept: client, name, open: openVal, phaseDetails });
+        const tagStr = (document.getElementById(`bg-tags-${r}`)?.value || '');
+        const tags = tagStr.split(',').map(s => s.trim()).reduce((acc, label) => {
+            const t = PRESET_TAGS.find(t => t.label === label || t.id === label);
+            if (t && !acc.includes(t.id)) acc.push(t.id);
+            return acc;
+        }, []);
+        AppState.projects.push({ id: Date.now() + r, team, part, pm, clientDept: client, name, open: openVal, phaseDetails, tags });
         saved++;
     }
     if (saved > 0) { saveToStorage(); renderDashboard(); }
@@ -182,14 +190,14 @@ function saveBulk() {
 
 function downloadBulkTemplate() {
     const bom = '﻿';
-    const header = '프로젝트명,담당팀,담당파트,담당자,의뢰부서,적용예정일,1단계,1시작,1종료,1설명,2단계,2시작,2종료,2설명,3단계,3시작,3종료,3설명,4단계,4시작,4종료,4설명,5단계,5시작,5종료,5설명';
+    const header = '프로젝트명,담당팀,담당파트,담당자,의뢰부서,적용예정일,태그,1단계,1시작,1종료,1설명,2단계,2시작,2종료,2설명,3단계,3시작,3종료,3설명,4단계,4시작,4종료,4설명,5단계,5시작,5종료,5설명';
     const rows = [
-        '여신심사 업무시스템 고도화,여신심사팀,심사1파트,홍길동,개인여신부,2026-11-30,분석/설계,2026-01-02,2026-03-31,현행 시스템 분석 및 요건 정의,개발,2026-04-01,2026-08-31,신규 기능 개발 및 API 연동,통합테스트,2026-09-01,2026-10-15,전 모듈 통합 테스트,안정화,2026-10-16,2026-11-30,운영 이관 및 안정화,,,,',
-        '여신업무 처리 자동화,여신업무팀,업무지원파트,이순신,기업여신부,2026-10-31,요건정의,2026-01-15,2026-03-14,업무 자동화 범위 및 요건 정의,개발,2026-03-15,2026-07-31,자동화 모듈 개발 및 단위 테스트,검증,2026-08-01,2026-10-31,파일럿 운영 및 검증,,,,,,,,',
-        '여신관리 모니터링 시스템 구축,여신관리팀,관리시스템파트,강감찬,여신관리부,2026-12-31,현황분석,2026-02-01,2026-03-31,현행 모니터링 체계 분석,설계,2026-04-01,2026-06-30,신규 모니터링 아키텍처 설계,개발,2026-07-01,2026-10-31,대시보드 및 알림 기능 개발,오픈준비,2026-11-01,2026-12-31,안정화 및 운영 이관,,,,',
-        '신용평가 모델 고도화,상품/신용평가팀,신용평가파트,장보고,신용평가부,2026-09-30,요건정의,2026-01-15,2026-02-28,평가 모델 요건 및 데이터 정의,모델개발,2026-03-01,2026-06-30,ML 모델 학습 및 검증,파일럿,2026-07-01,2026-08-31,파일럿 운영 및 성능 평가,운영이관,2026-09-01,2026-09-30,운영계 배포 및 모니터링,,,,',
-        '외환거래 플랫폼 재구축,외환팀,외환IT파트,을지문덕,외환영업부,2026-10-31,현황분석,2026-02-01,2026-03-15,현행 플랫폼 분석 및 아키텍처 수립,설계,2026-03-16,2026-05-31,신규 플랫폼 설계,개발,2026-06-01,2026-09-15,플랫폼 개발 및 연동,검수,2026-09-16,2026-10-31,QA 및 오픈 준비,,,,',
-        'PPR 보고체계 전산화,PPR팀,경영기획파트,유관순,기획부,2026-12-31,요건정의,2026-03-01,2026-04-30,보고 양식 및 데이터 요건 정의,설계/개발,2026-05-01,2026-09-30,보고 화면 및 배치 개발,테스트,2026-10-01,2026-11-15,사용자 수용 테스트,오픈준비,2026-11-16,2026-12-31,데이터 검증 및 오픈 준비,,,'
+        '여신심사 업무시스템 고도화,여신심사팀,개인여신심사,홍길동,개인여신부,2026-11-30,자체개선,분석/설계,2026-01-02,2026-03-31,현행 시스템 분석 및 요건 정의,개발,2026-04-01,2026-08-31,신규 기능 개발 및 API 연동,통합테스트,2026-09-01,2026-10-15,전 모듈 통합 테스트,안정화,2026-10-16,2026-11-30,운영 이관 및 안정화,,,,',
+        '여신업무 처리 자동화,여신업무팀,여신계약,이순신,기업여신부,2026-10-31,신규,요건정의,2026-01-15,2026-03-14,업무 자동화 범위 및 요건 정의,개발,2026-03-15,2026-07-31,자동화 모듈 개발 및 단위 테스트,검증,2026-08-01,2026-10-31,파일럿 운영 및 검증,,,,,,,,',
+        '여신관리 모니터링 시스템 구축,여신관리팀,여신담보,강감찬,여신관리부,2026-12-31,법령,현황분석,2026-02-01,2026-03-31,현행 모니터링 체계 분석,설계,2026-04-01,2026-06-30,신규 모니터링 아키텍처 설계,개발,2026-07-01,2026-10-31,대시보드 및 알림 기능 개발,오픈준비,2026-11-01,2026-12-31,안정화 및 운영 이관,,,,',
+        '신용평가 모델 고도화,상품/신용평가팀,상품관리,장보고,신용평가부,2026-09-30,자체개선,요건정의,2026-01-15,2026-02-28,평가 모델 요건 및 데이터 정의,모델개발,2026-03-01,2026-06-30,ML 모델 학습 및 검증,파일럿,2026-07-01,2026-08-31,파일럿 운영 및 성능 평가,운영이관,2026-09-01,2026-09-30,운영계 배포 및 모니터링,,,,',
+        '외환거래 플랫폼 재구축,외환팀,외국환,을지문덕,외환영업부,2026-10-31,,현황분석,2026-02-01,2026-03-15,현행 플랫폼 분석 및 아키텍처 수립,설계,2026-03-16,2026-05-31,신규 플랫폼 설계,개발,2026-06-01,2026-09-15,플랫폼 개발 및 연동,검수,2026-09-16,2026-10-31,QA 및 오픈 준비,,,,',
+        'PPR 보고체계 전산화,PPR팀,이미지플랫폼,유관순,기획부,2026-12-31,예정,요건정의,2026-03-01,2026-04-30,보고 양식 및 데이터 요건 정의,설계/개발,2026-05-01,2026-09-30,보고 화면 및 배치 개발,테스트,2026-10-01,2026-11-15,사용자 수용 테스트,오픈준비,2026-11-16,2026-12-31,데이터 검증 및 오픈 준비,,,'
     ];
     const csv = bom + header + '\n' + rows.join('\n') + '\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -223,8 +231,9 @@ function importBulkCSV(event) {
             set(`bg-name-${rid}`, cols[0]); set(`bg-team-${rid}`, cols[1]);
             set(`bg-part-${rid}`, cols[2]); set(`bg-pm-${rid}`, cols[3]);
             set(`bg-client-${rid}`, cols[4]); setDate(`bg-open-${rid}`, cols[5]);
+            set(`bg-tags-${rid}`, cols[6]);
             for (let p = 0; p < 5; p++) {
-                const base = 6 + p * 4;
+                const base = 7 + p * 4;
                 set(`bg-p${p+1}n-${rid}`, cols[base]); setDate(`bg-p${p+1}s-${rid}`, cols[base+1]);
                 setDate(`bg-p${p+1}e-${rid}`, cols[base+2]); set(`bg-p${p+1}d-${rid}`, cols[base+3]);
             }

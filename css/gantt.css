@@ -106,6 +106,14 @@
 .phase-bar.first-phase.phase-continues {
     clip-path: polygon(100% 0%, 100% 100%, 0% 100%, 0% 0%) !important;
 }
+/* 전년도에서 이어지는 바: 왼쪽 화살표 컷 */
+.phase-bar.phase-continues-left {
+    clip-path: polygon(0% 0%, calc(100% - 10px) 0%, 100% 50%, calc(100% - 10px) 100%, 0% 100%) !important;
+}
+/* 양쪽 모두 넘치는 경우 */
+.phase-bar.phase-continues-left.phase-continues {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%) !important;
+}
 
 .today-line {
     position: absolute; top: 0; bottom: 0; width: 1px;

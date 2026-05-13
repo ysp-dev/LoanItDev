@@ -37,9 +37,9 @@
         pct = Math.max(0, Math.min(99.9, pct));
         const tm = pct / 100 * 12;
         const mo = Math.min(11, Math.floor(tm));
-        const dim = new Date(CURRENT_YEAR, mo + 1, 0).getDate();
+        const dim = new Date(AppState.currentYear, mo + 1, 0).getDate();
         const day = Math.max(1, Math.min(dim, Math.round((tm - mo) * dim) + 1));
-        return `${CURRENT_YEAR}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        return `${AppState.currentYear}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     }
 
     function showTip(e, s, en) {
@@ -114,12 +114,9 @@
         ds.bar.style.width = W + '%';
         showTip(e, posToDate(L), posToDate(L + W));
         const bw = ds.bar.offsetWidth;
-        if (bw < 16)       { ds.bar.style.fontSize = '0';      ds.bar.style.padding = '0'; }
-        else if (bw < 28)  { ds.bar.style.fontSize = '0.44rem'; ds.bar.style.padding = '0 2px'; }
-        else if (bw < 45)  { ds.bar.style.fontSize = '0.52rem'; ds.bar.style.padding = '0 4px'; }
-        else if (bw < 70)  { ds.bar.style.fontSize = '0.6rem';  ds.bar.style.padding = ''; }
-        else if (bw < 95)  { ds.bar.style.fontSize = '0.72rem'; ds.bar.style.padding = ''; }
-        else               { ds.bar.style.fontSize = '';        ds.bar.style.padding = ''; }
+        const step = BAR_FONT_STEPS.find(s => bw < s.maxW);
+        if (step) { ds.bar.style.fontSize = step.fontSize; ds.bar.style.padding = step.padding; }
+        else      { ds.bar.style.fontSize = '';            ds.bar.style.padding = ''; }
     });
 
     document.addEventListener('mouseup', function(e) {
@@ -129,7 +126,7 @@
             const W = parseFloat(ds.bar.style.width);
             const newStart = posToDate(L);
             const newEnd   = posToDate(L + W);
-            const proj = projects.find(p => p.id === ds.projId);
+            const proj = AppState.projects.find(p => p.id === ds.projId);
             if (proj && proj.phaseDetails[ds.phaseIdx]) {
                 // 종료일이 오픈일을 초과하면 되돌리고 안내
                 if (proj.open && new Date(newEnd) > new Date(proj.open)) {
@@ -143,6 +140,7 @@
                     ds = null;
                     return;
                 }
+                saveHistory(`${proj.phaseDetails[ds.phaseIdx].name || '단계'} 드래그 전`);
                 proj.phaseDetails[ds.phaseIdx].start = newStart;
                 proj.phaseDetails[ds.phaseIdx].end   = newEnd;
                 cascadePhases(proj, ds.phaseIdx);
@@ -150,8 +148,7 @@
                 saveToStorage();
                 _ganttDragged = true;
                 renderSingleGanttRow(proj.id);
-                requestAnimationFrame(autoFitBarFonts);
-                requestAnimationFrame(drawDepLines);
+                requestAnimationFrame(() => { autoFitBarFonts(); requestAnimationFrame(drawDepLines); });
                 const cascaded = proj.phaseDetails.slice(ds.phaseIdx + 1)
                     .filter(pd => pd.start !== proj.phaseDetails[ds.phaseIdx].end);
                 const cascadeNote = cascaded.length
@@ -166,35 +163,37 @@
     });
 })();
 
-// 다른 사용자 변경사항 감지: 탭 포커스 시 서버 데이터와 비교 후 갱신
-window.addEventListener('focus', async () => {
-    try {
-        const res = await fetch('/api/projects');
-        if (!res.ok) return;
-        const fresh = await res.json();
-        if (Array.isArray(fresh) && JSON.stringify(fresh) !== JSON.stringify(projects)) {
-            projects = fresh;
-            renderDashboard();
-        }
-    } catch(e) {}
-});
+// 탭 포커스 폴링 → WebSocket 실시간 동기화로 대체됨 (socket.js)
 
 window.onload = () => {
-    // 연도 동적 적용 (헤더 텍스트 + 페이지 타이틀 + footer)
-    document.getElementById('header-sub-tag').innerText = `Loan IT Dept. Roadmap ${CURRENT_YEAR}`;
-    document.getElementById('header-title').innerText   = `${CURRENT_YEAR} 여신IT개발부 주요 프로젝트 현황`;
-    document.title = `${CURRENT_YEAR} 여신IT개발부 주요 프로젝트 현황`;
+    // 연도 동적 적용 (헤더 텍스트 + 페이지 타이틀 + footer + 연도 선택기)
+    document.getElementById('header-sub-tag').innerText = `Credit IT Development Department Roadmap ${AppState.currentYear}`;
+    document.getElementById('header-title').innerText   = `${AppState.currentYear} 여신IT개발부 주요 프로젝트 현황`;
+    document.title = `${AppState.currentYear} 여신IT개발부 주요 프로젝트 현황`;
     const fyEl = document.getElementById('footer-year');
-    if (fyEl) fyEl.innerText = `© ${CURRENT_YEAR} `;
+    if (fyEl) fyEl.innerText = `© ${AppState.currentYear} `;
+    const ydEl = document.getElementById('year-display');
+    if (ydEl) ydEl.innerText = AppState.currentYear;
 
     const fContainer = document.getElementById('filter-container');
     const teamBtnClass = { '전체': 'filter-btn-all', '여신심사팀': 'filter-btn-team-a', '여신업무팀': 'filter-btn-team-b', '여신관리팀': 'filter-btn-team-c', '상품/신용평가팀': 'filter-btn-team-d', '외환팀': 'filter-btn-team-e', 'PPR팀': 'filter-btn-team-f' };
-    fContainer.innerHTML = teams.map(team => `<button class="filter-btn ${teamBtnClass[team] || ''} ${currentFilter === team ? 'active' : ''}" data-team="${team}" onclick="setFilter('${team}')">${team}</button>`).join('');
+    fContainer.innerHTML = teams.map(team => `<button class="filter-btn ${teamBtnClass[team] || ''} ${AppState.currentFilter === team ? 'active' : ''}" data-team="${team}" onclick="setFilter('${team}')">${team}</button>`).join('');
 
     setInterval(updateLiveClock, 1000);
     updateLiveClock();
 
     initData();
+    initTagInput();
+    _startIdleReload();
+    _startPeriodicRefresh();
+    if (typeof _initSocket === 'function') _initSocket();
+
+    // 폼 dirty 트래킹: adminSingle 내 입력 변경 시 플래그 설정
+    const adminSingle = document.getElementById('adminSingle');
+    if (adminSingle) {
+        adminSingle.addEventListener('input',  () => { AppState.formDirty = true; });
+        adminSingle.addEventListener('change', () => { AppState.formDirty = true; });
+    }
 
     // 날짜 입력 연도 4자리 보정 (전역)
     document.addEventListener('input', function(e) {

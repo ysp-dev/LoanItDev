@@ -17,7 +17,7 @@ function fmtD(str) {
 
 // D-Day 계산 → { text, cls }
 function calcDDay(openStr, now) {
-    const diff = Math.round((new Date(openStr) - now) / 86400000);
+    const diff = Math.round((new Date(openStr) - now) / MS_PER_DAY);
     if (diff > 0)      return { text: `D-${diff}`,           cls: diff <= 7 ? 'dday-urgent' : diff <= 30 ? 'dday-warn' : 'dday-normal' };
     if (diff === 0)    return { text: 'D-Day',               cls: 'dday-today' };
     return             { text: `D+${Math.abs(diff)}`,        cls: 'dday-past' };
@@ -90,12 +90,20 @@ function syncDateWraps() {
         }
     });
 }
+const _colorCache = new Map();
+
+function clearColorCache() { _colorCache.clear(); }
+
 function resolveColor(color) {
     if (!color || !color.startsWith('var(')) return color;
+    const cached = _colorCache.get(color);
+    if (cached !== undefined) return cached;
     const varName = color.match(/var\(\s*(--[^)]+)\s*\)/)?.[1];
     if (!varName) return color;
     const resolved = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-    return resolved || color;
+    const result = resolved || color;
+    _colorCache.set(color, result);
+    return result;
 }
 
 function hexToRgba(hex, alpha) {
@@ -179,7 +187,7 @@ function hl(str, q) {
 function _countUp(id, target, fmt, color) {
     const el = document.getElementById(id);
     if (!el) return;
-    if (color) el.style.color = color;
+    el.style.color = color ?? '';
     const prev = parseFloat(el.dataset.prev || 0);
     el.dataset.prev = target;
     if (prev === target) { el.innerText = fmt(target); return; }
@@ -198,6 +206,7 @@ function _countUp(id, target, fmt, color) {
     const lv = document.getElementById('list-view');
     if (lv) lv.addEventListener('scroll', () => lv.classList.toggle('scrolled', lv.scrollTop > 2));
 })();
+
 
 function showMsg(text, type) {
     const el = document.getElementById('msgBox');

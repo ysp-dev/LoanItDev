@@ -21,7 +21,7 @@
     <div id="ie-overlay" style="display:none;">
         <div class="ie-box">
             <div class="ie-icon">🔷</div>
-            <div class="ie-title">Microsoft Edge를 사용해 주세요</div>
+            <div class="ie-title">Microsoft Edge를 사용해 주세요</div>86400000(ms/일), 0.3(막대 최소 폭 %) 등이 여러 위치에 하드코딩 되어 있습니다.
             <div class="ie-desc">
                 현재 접속하신 <strong>Internet Explorer</strong>는 지원이 종료된 브라우저로,<br>
                 이 대시보드가 정상적으로 동작하지 않을 수 있습니다.<br><br>
@@ -36,6 +36,8 @@
     <script src="js/ie.js"></script>
 
     <div id="msgBox"></div>
+
+
     <div id="ganttTooltip" class="gantt-tooltip"></div>
     <div id="ganttDragTip" class="gantt-drag-tip"></div>
     <svg id="depDefs" style="position:absolute;width:0;height:0;overflow:hidden;">
@@ -67,6 +69,22 @@
         <div class="nav-tabs">
             <div id="tabDash" class="nav-tab active" onclick="switchView('dashboard')">대시보드</div>
             <div id="tabAdmin" class="nav-tab" onclick="switchView('admin')">프로젝트 추가</div>
+            <div class="nav-io-group">
+                <button class="io-btn export" onclick="exportProjects()" title="현재 프로젝트 데이터를 JSON 파일로 저장합니다">내보내기</button>
+                <button class="io-btn import" onclick="document.getElementById('import-file-input').click()" title="JSON 파일을 불러와 현재 데이터를 덮어씁니다">가져오기</button>
+                <button class="io-btn merge"  onclick="document.getElementById('merge-file-input').click()"  title="JSON 파일을 불러와 기존 데이터에 병합합니다 (중복 제외)">병합 가져오기</button>
+                <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event, false)">
+                <input type="file" id="merge-file-input"  accept=".json" style="display:none" onchange="handleImportFile(event, true)">
+            </div>
+            <div class="live-clock-container">
+                <span id="live-date" class="clock-date">2026년 00월 00일 (요일)</span>
+                <span class="clock-sep"></span>
+                <div class="clock-time">
+                    <span class="clock-live-dot"></span>
+                    <span id="live-time">00:00</span>
+                </div>
+            </div>
+            <div class="nav-sep" style="width:1px;align-self:stretch;background:var(--border-color);flex-shrink:0;"></div>
             <button class="theme-toggle" id="theme-toggle-btn" onclick="toggleTheme()">
                 <span class="theme-toggle-icon"></span>
                 <span id="theme-toggle-label">다크모드</span>
@@ -75,47 +93,43 @@
 
         <div id="dashboardView">
             <header>
-                <div class="header-title">
-                    <div id="header-sub-tag" class="sub-tag">Loan IT Dept. Roadmap 2026</div>
-                    <h1 id="header-title">2026 여신IT개발부 주요 프로젝트 현황</h1>
-                    <div id="filter-container" class="filter-group" style="margin-top:8px;"></div>
-                </div>
-
-                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px;">
-                    <div class="live-clock-container">
-                        <span id="live-date" class="clock-date">2026년 00월 00일 (요일)</span>
-                        <span class="clock-sep"></span>
-                        <div class="clock-time">
-                            <span class="clock-live-dot"></span>
-                            <span id="live-time">00:00</span>
+                <div class="header-top">
+                    <div class="header-sub-row">
+                        <div id="header-sub-tag" class="sub-tag">Credit IT Development Department Roadmap 2026</div>
+                        <div class="header-saved-info">
+                            <span class="io-info" id="io-last-saved">- 저장 정보 로딩 중...</span>
+                            <span class="io-info" id="io-idle-countdown" style="display:none;color:#aaa;font-weight:500;"></span>
                         </div>
                     </div>
-                    <div style="display:flex;gap:5px;align-items:center;">
-                        <input class="search-input" type="search" id="search-input" placeholder="통합 검색 (프로젝트명·담당자·팀·단계설명)..." onkeydown="if(event.key==='Enter')setSearch(this.value)" style="width:210px;">
-                        <button class="search-btn" onclick="setSearch(document.getElementById('search-input').value)">검색</button>
+                    <div class="header-h1-row">
+                        <h1 id="header-title">2026 여신IT개발부 주요 프로젝트 현황</h1>
+                        <div class="header-search">
+                            <input class="search-input" type="search" id="search-input" placeholder="통합 검색..." onkeydown="if(event.key==='Enter')setSearch(this.value)">
+                            <button class="search-btn" onclick="setSearch(document.getElementById('search-input').value)">검색</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- 연도·팀필터·태그 -->
+                <div class="header-controls">
+                    <div class="filter-year-wrap">
+                        <div id="filter-container" class="filter-group" style="margin-top:0;"></div>
+                        <div class="filter-year-sep" id="tag-filter-divider" style="width:1px;height:22px;background:#DDDDDD;flex-shrink:0;display:none;"></div>
+                        <div id="tag-filter-container" class="tag-filter-group" style="display:none;"></div>
+                        <div class="filter-year-sep" style="width:1px;height:22px;background:#DDDDDD;flex-shrink:0;margin-left:auto;"></div>
+                        <div class="year-selector">
+                            <button class="year-btn" onclick="setYear(AppState.currentYear - 1)" title="이전 연도">&lsaquo;</button>
+                            <div class="year-display-pill">
+                                <span id="year-display" class="year-display"></span><span class="year-unit">년</span>
+                            </div>
+                            <button class="year-btn" onclick="setYear(AppState.currentYear + 1)" title="다음 연도">&rsaquo;</button>
+                        </div>
                     </div>
                 </div>
             </header>
 
-            <!-- 내보내기/가져오기 툴바 -->
-            <div class="io-toolbar">
-                <span class="io-toolbar-label">DATA</span>
-                <button class="io-btn export" onclick="exportProjects()" title="현재 프로젝트 데이터를 JSON 파일로 저장합니다">
-                    내보내기
-                </button>
-                <button class="io-btn import" onclick="document.getElementById('import-file-input').click()" title="JSON 파일을 불러와 현재 데이터를 덮어씁니다">
-                    가져오기
-                </button>
-                <button class="io-btn merge" onclick="document.getElementById('merge-file-input').click()" title="JSON 파일을 불러와 기존 데이터에 병합합니다 (중복 제외)">
-                    병합 가져오기
-                </button>
-                <div class="io-toolbar-divider"></div>
-                <span class="io-info" id="io-last-saved">- 저장 정보 로딩 중...</span>
-            </div>
-            <!-- 파일 입력 (숨김) -->
-            <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(event, false)">
-            <input type="file" id="merge-file-input"  accept=".json" style="display:none" onchange="handleImportFile(event, true)">
 
+            <!-- 마감 임박 알림 배너 -->
+            <div id="alert-banner" class="alert-banner" style="display:none;"></div>
 
             <div class="stats-grid">
                 <div class="stat-card sc-total">
@@ -246,14 +260,25 @@
                             <div class="form-group req">
                                 <label>적용예정일</label>
                                 <div class="date-wrap ph-show">
-                                    <input type="date" id="in-open" min="2000-01-01" max="2099-12-31" onchange="validateSingleDate(this)">
+                                    <input type="date" id="in-open" min="2000-01-01" max="2099-12-31" autocomplete="off" onchange="validateSingleDate(this)">
                                 </div>
+                            </div>
+                            <div class="form-group" id="tag-input-group" style="grid-column:1/-1;">
+                                <label>태그 <span style="font-size:0.6rem;color:#94a3b8;font-weight:500;">(선택, 다중 선택 가능)</span></label>
+                                <div class="tag-input-wrap" id="tag-input-wrap"></div>
+                            </div>
+                            <div class="form-group" id="dep-select-group" style="grid-column:1/-1;">
+                                <label style="display:flex;align-items:center;justify-content:space-between;">
+                                    <span>선행 프로젝트 <span style="font-size:0.6rem;color:#94a3b8;font-weight:500;">(선택 · 클릭으로 다중 선택 가능)</span></span>
+                                    <span id="dep-count-badge" style="display:none;font-size:0.65rem;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:10px;"></span>
+                                </label>
+                                <div class="dep-picker" id="dep-picker"></div>
                             </div>
                         </div>
                     </div>
                     <div class="stepper-nav">
                         <div></div>
-                        <button class="btn-step-next" onclick="if(validateStep(1)) goStep(2)">세부일정 입력 →</button>
+                        <button class="btn-step-nav" onclick="if(validateStep(1)) goStep(2)">세부일정 입력 →</button>
                     </div>
                 </div>
 
@@ -265,7 +290,7 @@
                     </div>
                     <div class="stepper-nav">
                         <button class="btn-step-back" onclick="goStep(1)">← 기본정보</button>
-                        <button class="btn-step-next" onclick="if(validateStep(2)) saveNewProject()">✓ 등록 및 로드맵 반영</button>
+                        <button id="btn-step2-submit" class="btn-step-next" onclick="if(validateStep(2)) saveNewProject()">✓ 등록 및 로드맵 반영</button>
                     </div>
                 </div>
 
@@ -304,6 +329,7 @@
                                 <th rowspan="2" style="min-width:60px;">담당자</th>
                                 <th rowspan="2" style="min-width:72px;">의뢰부서</th>
                                 <th rowspan="2" style="min-width:90px;">적용예정일</th>
+                                <th rowspan="2" style="min-width:110px;">태그</th>
                                 <th colspan="4" class="ph-h1">1단계</th>
                                 <th colspan="4" class="ph-h2">2단계</th>
                                 <th colspan="4" class="ph-h3">3단계</th>
@@ -325,7 +351,7 @@
         </div>
 
         <footer>
-            <span id="footer-year"></span>&nbsp;Loan IT Dev Dept.
+            <span id="footer-year"></span>&nbsp;Credit IT Development Department
             <span class="footer-sep">|</span>
             <span class="footer-meta">Crafted by Brian Park &middot; Powered by Claude Code &amp; Gemini</span>
             <span class="footer-sep">|</span>
@@ -344,5 +370,7 @@
     <script src="js/excel.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/init.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/socket.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 function exportExcel() {
-    if (!projects.length) { showMsg('내보낼 프로젝트가 없습니다.'); return; }
+    if (!AppState.projects.length) { showMsg('내보낼 프로젝트가 없습니다.'); return; }
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
     const dateFmt  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -9,19 +9,20 @@ function exportExcel() {
     const cCell   = v => mkCell(v, 'xCtr');
     const lCell   = v => mkCell(v, 'xLft');
 
-    // 컬럼 순서: No, 프로젝트명, 팀, 담당파트, 담당자, 의뢰부서, 개발시작, 개발종료, 총개발기간, D-Day, 적용예정일, 현재단계
-    const colWidths = [35, 200, 90, 80, 65, 90, 75, 75, 70, 55, 80, 80];
+    // 컬럼 순서: No, 프로젝트명, 팀, 담당파트, 담당자, 의뢰부서, 개발시작, 개발종료, 총개발기간, D-Day, 적용예정일, 현재단계, 태그
+    const colWidths = [35, 200, 90, 80, 65, 90, 75, 75, 70, 55, 80, 80, 120];
     const colXml = colWidths.map(w => `<Column ss:Width="${w}"/>`).join('');
-    const hdrLabels = ['No','프로젝트명','팀','담당파트','담당자','의뢰부서','개발시작','개발종료','총개발기간','D-Day','적용예정일','현재단계'];
+    const hdrLabels = ['No','프로젝트명','팀','담당파트','담당자','의뢰부서','개발시작','개발종료','총개발기간','D-Day','적용예정일','현재단계','태그'];
 
-    const dataRows = projects.slice().sort((a,b)=>new Date(a.open)-new Date(b.open)).map((p,i)=>{
+    const dataRows = AppState.projects.slice().sort((a,b)=>new Date(a.open)-new Date(b.open)).map((p,i)=>{
         const { text: ddayTxt } = calcDDay(p.open, now);
         const { periodStart: fs, periodEnd: le, durStr } = calcDuration(p);
         const curPhase = calcCurPhase(p, now);
         return `<Row>${[
             cCell(i+1), lCell(p.name), cCell(p.team), cCell(p.part||''),
             cCell(p.pm), cCell(p.clientDept||''), cCell(fs), cCell(le),
-            cCell(durStr), cCell(ddayTxt), cCell(p.open), cCell(curPhase)
+            cCell(durStr), cCell(ddayTxt), cCell(p.open), cCell(curPhase),
+            lCell((p.tags||[]).map(tid => PRESET_TAGS.find(t=>t.id===tid)?.label||tid).join(', '))
         ].join('')}</Row>`;
     }).join('');
 

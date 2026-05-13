@@ -1,4 +1,66 @@
+// 10분 주기 서버 데이터 자동 갱신
+const AUTO_REFRESH_INTERVAL = 10 * 60 * 1000;
+
+function _startPeriodicRefresh() {
+    setInterval(async () => {
+        if (AppState.currentView === 'admin') return;
+        AppState.projects = await loadFromStorage();
+        renderDashboard();
+    }, AUTO_REFRESH_INTERVAL);
+}
+
+// 대시보드 유휴 자동 새로고침 (1분 무액션 시, 5초 후 카운트다운 표시)
+let _idleTimer = null;
+let _idleShowTimer = null;
+let _idleCountdownInterval = null;
+const IDLE_TIMEOUT = 10 * 60 * 1000;
+const IDLE_SHOW_AFTER = 60 * 1000;
+const _idleEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+
+function _updateCountdownEl(secs) {
+    const el = document.getElementById('io-idle-countdown');
+    if (!el) return;
+    if (secs === null) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = '';
+    el.textContent = `· 새로고침 ${secs}분 전`;
+}
+
+function _resetIdleTimer() {
+    clearTimeout(_idleTimer);
+    clearTimeout(_idleShowTimer);
+    clearInterval(_idleCountdownInterval);
+    _updateCountdownEl(null);
+
+    _idleShowTimer = setTimeout(() => {
+        let remaining = Math.round((IDLE_TIMEOUT - IDLE_SHOW_AFTER) / 60000);
+        _updateCountdownEl(remaining);
+        _idleCountdownInterval = setInterval(() => {
+            remaining -= 1;
+            _updateCountdownEl(remaining > 0 ? remaining : 0);
+        }, 60000);
+    }, IDLE_SHOW_AFTER);
+
+    _idleTimer = setTimeout(() => location.reload(), IDLE_TIMEOUT);
+}
+
+function _startIdleReload() {
+    _idleEvents.forEach(e => document.addEventListener(e, _resetIdleTimer, { passive: true }));
+    _resetIdleTimer();
+}
+
+function _stopIdleReload() {
+    clearTimeout(_idleTimer);
+    clearTimeout(_idleShowTimer);
+    clearInterval(_idleCountdownInterval);
+    _updateCountdownEl(null);
+    _idleEvents.forEach(e => document.removeEventListener(e, _resetIdleTimer));
+}
+
 function switchView(view, isEdit = false) {
+    if (view === 'dashboard' && AppState.formDirty) {
+        if (!confirm('입력 중인 내용이 있습니다.\n대시보드로 이동하면 변경 사항이 사라집니다.\n계속하시겠습니까?')) return;
+    }
+    AppState.formDirty = false;
     if(view === 'dashboard') {
         const dv = document.getElementById('dashboardView');
         dv.style.display = 'block';
@@ -6,11 +68,13 @@ function switchView(view, isEdit = false) {
         document.getElementById('adminView').style.display = 'none';
         document.getElementById('tabDash').classList.add('active');
         document.getElementById('tabAdmin').classList.remove('active');
-        currentFilter = '전체';
-        currentSearch = '';
+        AppState.currentFilter = '전체';
+        AppState.currentSearch = '';
         const si = document.getElementById('search-input'); if (si) si.value = '';
+        _startIdleReload();
         renderDashboard();
     } else {
+        _stopIdleReload();
         document.getElementById('dashboardView').style.display = 'none';
         const av = document.getElementById('adminView');
         av.style.display = 'block';
@@ -21,11 +85,12 @@ function switchView(view, isEdit = false) {
         window.scrollTo({ top: 0, behavior: 'instant' });
         
         if (!isEdit) {
-            editingProjectId = null;
+            AppState.editingProjectId = null;
             // 단계 입력 영역 완전히 비우고 재생성 → 잔여값 없이 깨끗하게 초기화
             document.getElementById('phase-inputs-container').innerHTML = '';
         }
         initPhaseInputs();
+        initTagInput();
 
         if (!isEdit) {
             resetForm(true);
@@ -37,6 +102,7 @@ function switchView(view, isEdit = false) {
             document.getElementById('btn-top-reset').innerText = '전체 항목 초기화';
             const badge = document.getElementById('form-mode-badge');
             badge.style.display = 'none'; badge.innerText = '';
+            document.getElementById('btn-step2-submit').style.display = '';
             syncDateWraps();
         }
         // 단건 탭으로 기본 이동
@@ -73,14 +139,15 @@ function updateLiveClock() {
 
 let _ganttDragged = false;
 
-function setSearch(val) { currentSearch = val.trim(); renderDashboard(); }
+function setSearch(val) { AppState.currentSearch = val.trim(); renderDashboard(); }
 
 function toggleCompact() {
-    compactView = !compactView;
+    AppState.compactView = !AppState.compactView;
     const btn = document.getElementById('btn-compact');
-    if (btn) btn.classList.toggle('active', compactView);
+    if (btn) btn.classList.toggle('active', AppState.compactView);
     const gc = document.getElementById('gantt-rows');
-    if (gc) gc.classList.toggle('gantt-compact', compactView);
+    if (gc) gc.classList.toggle('gantt-compact', AppState.compactView);
+    drawDepLines();
 }
 
 function onListChkChange() {
@@ -119,7 +186,8 @@ function deleteSelected() {
     const ids = [...new Set([...listIds, ...cardIds])];
     if (!ids.length) return;
     if (!confirm(`선택한 ${ids.length}건의 프로젝트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
-    projects = projects.filter(p => !ids.includes(p.id));
+    saveHistory(`선택 삭제 ${ids.length}건`);
+    AppState.projects = AppState.projects.filter(p => !ids.includes(p.id));
     saveToStorage();
     renderDashboard();
     showMsg(`${ids.length}건의 프로젝트가 삭제되었습니다.`);
@@ -127,7 +195,7 @@ function deleteSelected() {
     if (btn) btn.style.display = 'none';
 }
 function setView(mode) {
-    currentView = mode;
+    AppState.currentView = mode;
     document.getElementById('btn-view-card').classList.toggle('active', mode === 'card');
     document.getElementById('btn-view-list').classList.toggle('active', mode === 'list');
     document.getElementById('card-grid').style.display  = mode === 'card' ? '' : 'none';
@@ -146,7 +214,60 @@ function setView(mode) {
 }
 
 // 드래그 후 해당 프로젝트 행의 bar-area만 갱신 (전체 리렌더 없이)
-function setFilter(team) { currentFilter = team; document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.team === team)); renderDashboard(); }
+function setFilter(team) { AppState.currentFilter = team; document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.team === team)); renderDashboard(); }
+
+function setTagFilter(tagId) {
+    AppState.currentTagFilter = AppState.currentTagFilter === tagId ? null : tagId;
+    renderDashboard();
+}
+
+function renderTagFilter(projects) {
+    const el = document.getElementById('tag-filter-container');
+    const divider = document.getElementById('tag-filter-divider');
+    if (!el) return;
+    const src = projects ?? AppState.projects;
+    const hasTagged = src.some(p => p.tags?.length);
+    if (!hasTagged) {
+        el.style.display = 'none';
+        if (divider) divider.style.display = 'none';
+        // 현재 연도·팀에 없는 태그 필터는 자동 해제
+        if (AppState.currentTagFilter) AppState.currentTagFilter = null;
+        return;
+    }
+    el.style.display = '';
+    if (divider) divider.style.display = '';
+    // 현재 태그 필터가 이 목록에 없으면 자동 해제
+    if (AppState.currentTagFilter && !src.some(p => (p.tags||[]).includes(AppState.currentTagFilter))) {
+        AppState.currentTagFilter = null;
+    }
+    el.innerHTML = PRESET_TAGS.map(tag => {
+            const count = src.filter(p => p.tags?.includes(tag.id)).length;
+            if (!count) return '';
+            const isActive = AppState.currentTagFilter === tag.id;
+            return `<button class="tag-filter-btn" data-tag="${tag.id}"
+                style="${isActive ? `background:${tag.fg};color:white;border-color:${tag.fg};` : `background:${tag.bg};color:${tag.fg};border-color:${tag.bg};`}"
+                onclick="setTagFilter('${tag.id}')">
+                ${tag.label}<span class="tag-count">${count}</span>
+            </button>`;
+        }).join('') +
+        (AppState.currentTagFilter ? `<button class="tag-filter-btn tag-filter-clear" onclick="setTagFilter(null)">× 해제</button>` : '');
+}
+
+function toggleAlertBanner() {
+    const el = document.getElementById('alert-banner');
+    if (!el) return;
+    el.classList.toggle('collapsed');
+    const body = el.querySelector('.alert-banner-body');
+    const btn = el.querySelector('.alert-banner-toggle');
+    if (body) body.classList.toggle('collapsed');
+    if (btn) btn.textContent = el.classList.contains('collapsed') ? '펼치기' : '접기';
+}
+
+function dismissAlertBanner() {
+    sessionStorage.setItem('alert-banner-dismissed', '1');
+    const el = document.getElementById('alert-banner');
+    if (el) el.style.display = 'none';
+}
 
 // ── Cmd+K 커맨드 팔레트 ──────────────────────────────
 let _cmdSelIdx = -1;
@@ -172,8 +293,8 @@ function updateCmdPal() {
     if (!res) return;
 
     const matched = !q
-        ? projects.slice(0, 8)
-        : projects.filter(p =>
+        ? AppState.projects.slice(0, 8)
+        : AppState.projects.filter(p =>
             p.name.toLowerCase().includes(q) ||
             p.pm.toLowerCase().includes(q) ||
             p.team.toLowerCase().includes(q)
@@ -190,7 +311,7 @@ function updateCmdPal() {
             const styles = getStyleSet(p.team);
             return `<div class="cmdpal-item${i === _cmdSelIdx ? ' selected' : ''}" data-idx="${i}" onclick="cmdPalSelect(${i})" onmouseover="_cmdSelIdx=${i};renderCmdPalSel()">
                 <div class="cmdpal-item-icon" style="background:${statusBgForPalette(p)};color:${statusFgForPalette(p)};">${p.team.slice(0,2)}</div>
-                <div><div class="cmdpal-item-name">${p.name}</div><div class="cmdpal-item-meta">${p.team} · 담당자 ${p.pm} · D-${Math.max(0,Math.round((new Date(p.open)-new Date())/86400000))}</div></div>
+                <div><div class="cmdpal-item-name">${p.name}</div><div class="cmdpal-item-meta">${p.team} · 담당자 ${p.pm} · ${calcDDay(p.open, new Date()).text}</div></div>
             </div>`;
         }).join('');
     _cmdSelIdx = -1;
@@ -221,7 +342,7 @@ function renderCmdPalSel() {
 
 function cmdPalSelect(idx) {
     const q = (document.getElementById('cmdPalInput')?.value || '').toLowerCase().trim();
-    const matched = !q ? projects.slice(0,8) : projects.filter(p =>
+    const matched = !q ? AppState.projects.slice(0,8) : AppState.projects.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.pm.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)).slice(0,10);
     if (matched[idx]) { closeCmdPal(); editProject(matched[idx].id); }
@@ -254,15 +375,48 @@ document.addEventListener('keydown', function(e) {
         const ov = document.getElementById('cmdPalOverlay');
         if (ov?.classList.contains('open')) closeCmdPal(); else openCmdPal();
     }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        undoLast();
+    }
+});
+
+// ── 실행취소 (Ctrl+Z / Cmd+Z) ────────────────────────
+function saveHistory(label) {
+    AppState.commandHistory.push({ label, snapshot: JSON.parse(JSON.stringify(AppState.projects)) });
+    if (AppState.commandHistory.length > 10) AppState.commandHistory.shift();
+}
+
+function undoLast() {
+    const entry = AppState.commandHistory.pop();
+    if (!entry) { showMsg('되돌릴 작업이 없습니다.', 'warn'); return; }
+    AppState.projects = entry.snapshot;
+    saveToStorage();
+    renderDashboard();
+    showMsg(`실행 취소: ${entry.label}`);
+}
+
+// ── 폼 이탈 방지 (beforeunload) ───────────────────────
+window.addEventListener('beforeunload', function(e) {
+    if (AppState.formDirty) { e.preventDefault(); e.returnValue = ''; }
 });
 
 function updateSavedInfo() {
     const el = document.getElementById('io-last-saved');
     if (!el) return;
-    const raw = localStorage.getItem(LS_KEY);
+    // 서버 접속 시 projects 배열 기준으로 표시
+    if (AppState.projects.length > 0) {
+        const now = new Date();
+        const fmt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        el.innerText = `- ${AppState.projects.length}건 · 마지막 저장: ${fmt}`;
+        return;
+    }
+    const raw = localStorage.getItem(lsKey());
     if (!raw) { el.innerText = '- 저장 데이터 없음'; return; }
     try {
-        const meta = localStorage.getItem(LS_KEY + '_meta');
+        const meta = localStorage.getItem(lsKey() + '_meta');
         if (meta) {
             const { savedAt, count } = JSON.parse(meta);
             const d = new Date(savedAt);
@@ -277,15 +431,15 @@ function updateSavedInfo() {
 
 // ── 내보내기 ──────────────────────────────────────
 function exportProjects() {
-    if (projects.length === 0) { showMsg('내보낼 프로젝트가 없습니다.', 'warn'); return; }
+    if (AppState.projects.length === 0) { showMsg('내보낼 프로젝트가 없습니다.', 'warn'); return; }
     const now = new Date();
     const dateStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
     const payload = {
         exportedAt: now.toISOString(),
         exportedBy: 'SI Dashboard 2026',
         version: '1.0',
-        count: projects.length,
-        projects: projects
+        count: AppState.projects.length,
+        projects: AppState.projects
     };
     const json = JSON.stringify(payload, null, 2);
     const blob = new Blob(['﻿' + json], { type: 'application/json;charset=utf-8' }); // BOM 포함 → 윈도우 메모장 한글 깨짐 방지
@@ -297,7 +451,7 @@ function exportProjects() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showMsg(`${projects.length}개 프로젝트 내보내기 완료.\n다운로드 폴더에서 확인하세요.`);
+    showMsg(`${AppState.projects.length}개 프로젝트 내보내기 완료.\n다운로드 폴더에서 확인하세요.`);
 }
 
 // ── 가져오기 공통 처리 (isMerge: false=덮어쓰기, true=병합) ──
@@ -331,7 +485,7 @@ function handleImportFile(e, isMerge) {
 
             if (isMerge) {
                 // 병합: 기존 프로젝트명 기준으로 중복 제외
-                const existingNames = new Set(projects.map(p => p.name));
+                const existingNames = new Set(AppState.projects.map(p => p.name));
                 const toAdd = incoming.filter(p => !existingNames.has(p.name));
                 const skipped = incoming.length - toAdd.length;
                 if (toAdd.length === 0) {
@@ -340,21 +494,19 @@ function handleImportFile(e, isMerge) {
                 }
                 const msg = `[병합 가져오기]\n\n신규 추가: ${toAdd.length}개\n중복 제외: ${skipped}개${skipped > 0 ? '\n  -> ' + incoming.filter(p => existingNames.has(p.name)).map(p => p.name).join(', ') : ''}\n\n계속하시겠습니까?`;
                 if (!confirm(msg)) { e.target.value = ''; return; }
-                // ID 충돌 방지: 신규 ID 재발급
                 toAdd.forEach(p => { p.id = Date.now() + Math.random(); });
-                projects = [...projects, ...toAdd];
+                AppState.projects = [...AppState.projects, ...toAdd];
             } else {
-                // 덮어쓰기
                 const exportedAt = raw.exportedAt ? new Date(raw.exportedAt).toLocaleString('ko-KR') : '알 수 없음';
-                const msg = `[가져오기 - 덮어쓰기]\n\n파일 내 프로젝트: ${incoming.length}개\n내보낸 시각: ${exportedAt}\n\n[!] 현재 데이터(${projects.length}개)가 모두 교체됩니다.\n계속하시겠습니까?`;
+                const msg = `[가져오기 - 덮어쓰기]\n\n파일 내 프로젝트: ${incoming.length}개\n내보낸 시각: ${exportedAt}\n\n[!] 현재 데이터(${AppState.projects.length}개)가 모두 교체됩니다.\n계속하시겠습니까?`;
                 if (!confirm(msg)) { e.target.value = ''; return; }
-                projects = incoming;
+                AppState.projects = incoming;
             }
 
             saveToStorage();
-            currentFilter = '전체';
+            AppState.currentFilter = '전체';
             renderDashboard();
-            showMsg(`${isMerge ? '병합' : '가져오기'} 완료 — 현재 ${projects.length}개 프로젝트`);
+            showMsg(`${isMerge ? '병합' : '가져오기'} 완료 — 현재 ${AppState.projects.length}개 프로젝트`);
         } catch(err) {
             showMsg('파일 읽기 오류 — 올바른 JSON 파일인지 확인해 주세요.', 'error');
             console.error('[가져오기 오류]', err.message);
@@ -364,30 +516,79 @@ function handleImportFile(e, isMerge) {
     reader.readAsText(file, 'utf-8');
 }
 
-function resetAllData() {
+async function setYear(year) {
+    AppState.currentYear = year;
+    clearColorCache();
+    // 헤더/타이틀 갱신
+    document.getElementById('header-sub-tag').innerText = `Credit IT Development Department Roadmap ${year}`;
+    document.getElementById('header-title').innerText   = `${year} 여신IT개발부 주요 프로젝트 현황`;
+    document.title = `${year} 여신IT개발부 주요 프로젝트 현황`;
+    const fyEl = document.getElementById('footer-year');
+    if (fyEl) fyEl.innerText = `© ${year} `;
+    // 연도 선택기 표시 갱신
+    const yd = document.getElementById('year-display');
+    if (yd) yd.innerText = year;
+    // 데이터 재로드 & 렌더
+    AppState.projects = [];
+    await initData();
+    showMsg(`${year}년 데이터로 전환되었습니다.`);
+}
+
+async function resetAllData() {
     if (!confirm('[!] 저장된 모든 프로젝트 데이터를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) return;
-    localStorage.removeItem(LS_KEY);
-    localStorage.removeItem(LS_KEY + '_meta');
-    projects = [];
-    currentFilter = '전체';
+    // 모든 연도의 로컬스토리지 제거
+    Object.keys(localStorage)
+        .filter(k => k.startsWith('si_projects_'))
+        .forEach(k => localStorage.removeItem(k));
+    try {
+        await fetch('/api/projects', { method: 'DELETE' });
+    } catch(e) {}
+    AppState.projects = [];
+    AppState.currentFilter = '전체';
     renderDashboard();
     switchView('dashboard');
     showMsg('모든 데이터가 삭제되었습니다.');
 }
+function _applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('si-theme', theme);
+    const lbl = document.getElementById('theme-toggle-label');
+    if (lbl) lbl.innerText = theme === 'dark' ? '라이트모드' : '다크모드';
+}
+
+function _autoTheme() {
+    const h = new Date().getHours();
+    return (h >= 17 || h < 6) ? 'dark' : 'light';
+}
+
+function _scheduleAutoTheme() {
+    const now = new Date();
+    const h = now.getHours();
+    const next = new Date(now);
+    if (h < 6) {
+        next.setHours(6, 0, 0, 0);
+    } else if (h < 17) {
+        next.setHours(17, 0, 0, 0);
+    } else {
+        next.setDate(next.getDate() + 1);
+        next.setHours(6, 0, 0, 0);
+    }
+    setTimeout(function() {
+        _applyTheme(_autoTheme());
+        if (typeof clearColorCache === 'function') clearColorCache();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        _scheduleAutoTheme();
+    }, next - now);
+}
+
 function toggleTheme() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const next = isDark ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('si-theme', next);
-    const lbl = document.getElementById('theme-toggle-label');
-    if (lbl) lbl.innerText = next === 'dark' ? '라이트모드' : '다크모드';
-    // 막대 인라인 색상이 CSS 변수값이므로 테마 전환 시 재렌더링 필요
+    _applyTheme(isDark ? 'light' : 'dark');
+    clearColorCache();
     renderDashboard();
 }
 
 (function() {
-    const t = localStorage.getItem('si-theme') || 'light';
-    document.documentElement.setAttribute('data-theme', t);
-    const lbl = document.getElementById('theme-toggle-label');
-    if (lbl) lbl.innerText = t === 'dark' ? '라이트모드' : '다크모드';
+    _applyTheme(_autoTheme());
+    _scheduleAutoTheme();
 })();

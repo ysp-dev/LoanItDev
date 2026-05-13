@@ -17,12 +17,12 @@
     --gold: #FFBC00;               /* KB Yellow CI */
     --sidebar-width: 320px;
 
-    /* ── 단계 막대 — KB Yellow→Orange→Gold 계열 ── */
+    /* ── 단계 막대 — KB Yellow→Orange 계열 ── */
     --phase-1: #FFD338;            /* KB Yellow Web */
     --phase-2: #FFBC00;            /* KB Yellow CI */
     --phase-3: #FD9C26;            /* KB Orange Light */
     --phase-4: #F46600;            /* KB Orange */
-    --phase-5: #7D6C59;            /* KB Gold */
+    --phase-5: #C84B00;            /* KB Burnt Orange */
 
     --chart-text: #222222;         /* KB Title */
     --r-sm: 8px;

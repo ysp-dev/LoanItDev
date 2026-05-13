@@ -1,84 +1,510 @@
 function buildBarAreaHtml(p) {
     const now = new Date();
-    const todayPos = now.getFullYear() === CURRENT_YEAR ? getDatePos(now) : null;
-    const openDateObj = parseDate(p.open);
-    const isFutureOpen = openDateObj.getFullYear() > CURRENT_YEAR;
-    const endPos = isFutureOpen ? 100 : getDatePos(p.open);
+    const todayPos = now.getFullYear() === AppState.currentYear ? getDatePos(now) : null;
+    const openDateObj  = parseDate(p.open);
+    const openYear     = openDateObj.getFullYear();
+    // 오픈일 위치 결정:
+    //  - 해당 연도: 정확한 위치
+    //  - 내년 이후: 오른쪽 밖
+    //  - 이전 연도: 1월 왼쪽 앞 (비컨만 표시, 날짜 라벨 생략)
+    const openInThisYear  = openYear === AppState.currentYear;
+    const openInFuture    = openYear >  AppState.currentYear;
+    const openInPast      = openYear <  AppState.currentYear;
+    const milestoneStyle  = openInFuture ? 'left:calc(100% + 8px)'
+                          : openInPast   ? 'left:-20px'
+                          :                `left:${getDatePos(p.open)}%`;
+    const yearStart = new Date(AppState.currentYear, 0, 1);   // 1월 1일 00:00
+    const yearEnd   = new Date(AppState.currentYear, 11, 31); // 12월 31일 00:00
+
     const bars = p.phaseDetails.map((pd, idx) => {
         const pdStartDate = parseDate(pd.start);
         const pdEndDate   = parseDate(pd.end);
-        if (pdStartDate.getFullYear() > CURRENT_YEAR) return '';
-        const startX = getDatePos(pd.start);
-        const naturalEnd = getDatePos(pd.end);
-        const endsNextYear = pdEndDate.getFullYear() > CURRENT_YEAR;
-        const endX = endsNextYear ? 100 : naturalEnd;
-        const widthX = Math.max(0.3, endX - startX);
+
+        // 해당 연도와 전혀 겹치지 않으면 생략
+        if (pdEndDate < yearStart || pdStartDate > yearEnd) return '';
+
+        // 연도 경계로 클리핑 (전년도에서 이어지거나 내년으로 넘어가는 바 대응)
+        const clippedStart  = pdStartDate < yearStart ? yearStart : pdStartDate;
+        const clippedEnd    = pdEndDate   > yearEnd   ? yearEnd   : pdEndDate;
+        const startsPrevYear = pdStartDate < yearStart;
+        const endsNextYear   = pdEndDate   > yearEnd;
+
+        const startX = getDatePos(clippedStart);
+        const endX   = getDatePos(clippedEnd);
+        const widthX = Math.max(MIN_BAR_WIDTH, endX - startX);
+
         const safeDesc = (pd.desc||'')
             .replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n')
             .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         const pdEnd = new Date(pdEndDate); pdEnd.setHours(23,59,59);
         const phaseState = now > pdEnd ? 'phase-done' : (now >= pdStartDate ? 'phase-active' : '');
-        const continuesCls = endsNextYear ? ' phase-continues' : '';
-        const barLabel = pd.name.split(':')[1] || pd.name;
+        const continuesCls = (endsNextYear   ? ' phase-continues'      : '') +
+                             (startsPrevYear ? ' phase-continues-left'  : '');
+        const barLabel   = pd.name.split(':')[1] || pd.name;
         const safeBarDesc = (pd.desc||'').replace(/"/g,'&quot;').replace(/\r?\n/g,' ');
-        return `<div class="phase-bar ${idx===0?'first-phase':''} ${phaseState}${continuesCls}" data-pname="${barLabel.replace(/"/g,'&quot;')}" data-start="${pd.start}" data-end="${pd.end}" data-desc="${safeBarDesc}" data-proj-id="${p.id}" data-phase-idx="${idx}" style="left:${startX}%;width:${widthX}%;background-color:${resolveColor(pd.color)};background-image:linear-gradient(to bottom,rgba(255,255,255,0.30) 0%,rgba(255,255,255,0.06) 50%,rgba(0,0,0,0.08) 100%);">${barLabel}</div>`;
+        // 단계 번호를 이름("1단계:...")에서 추출, 없으면 순서(idx+1) 사용
+        const phaseNum   = parseInt(pd.name.match(/^(\d+)단계/)?.[1]) || (idx + 1);
+        const barColor   = resolveColor(`var(--phase-${Math.min(5, Math.max(1, phaseNum))})`);
+        return `<div class="phase-bar ${idx===0?'first-phase':''} ${phaseState}${continuesCls}" data-pname="${barLabel.replace(/"/g,'&quot;')}" data-start="${pd.start}" data-end="${pd.end}" data-desc="${safeBarDesc}" data-proj-id="${p.id}" data-phase-idx="${idx}" style="left:${startX}%;width:${widthX}%;background-color:${barColor};background-image:linear-gradient(to bottom,rgba(255,255,255,0.30) 0%,rgba(255,255,255,0.06) 50%,rgba(0,0,0,0.08) 100%);">${barLabel}</div>`;
     }).join('');
     const gridLines = Array.from({length:12},(_,mi)=>{
         const now2=new Date();
-        const isCur=now2.getFullYear()===CURRENT_YEAR&&now2.getMonth()===mi;
+        const isCur=now2.getFullYear()===AppState.currentYear&&now2.getMonth()===mi;
         return `<div class="grid-line${isCur?' current-month-bar':''}"></div>`;
     }).join('');
     const todayHtml = todayPos!==null
         ? `<div class="past-overlay" style="width:${todayPos}%;"></div><div class="today-line" style="left:${todayPos}%;"></div>` : '';
+    const milestoneLabel = openInPast ? '' : formatOpenTag(p.open);
+    const milestoneTitle = openInPast ? ` title="${p.open} 오픈 (전년도)"` : '';
     return gridLines + todayHtml + bars +
-        `<div class="milestone" style="left:${isFutureOpen?'calc(100% + 8px)':endPos+'%'};"><span class="open-beacon"><span class="open-beacon-ring"></span><span class="open-beacon-ring"></span><span class="open-beacon-dot"></span></span>${formatOpenTag(p.open)}</div>`;
+        `<div class="milestone" style="${milestoneStyle};"${milestoneTitle}><span class="open-beacon"><span class="open-beacon-ring"></span><span class="open-beacon-ring"></span><span class="open-beacon-dot"></span></span>${milestoneLabel}</div>`;
 }
 
 function renderSingleGanttRow(projId) {
-    const proj = projects.find(p => p.id === projId);
+    const proj = AppState.projects.find(p => p.id === projId);
     if (!proj) return;
     const row = document.querySelector(`.gantt-row[data-proj-id="${projId}"]`);
     if (!row) return;
     const barArea = row.querySelector('.bar-area');
     if (!barArea) return;
     barArea.innerHTML = buildBarAreaHtml(proj);
+    requestAnimationFrame(drawDepLines);
 }
 
+function drawDepLines() {
+    const ganttRows = document.getElementById('gantt-rows');
+    if (!ganttRows) return;
+
+    const hasDeps = AppState.projects.some(p => p.deps && p.deps.length > 0);
+
+    let svg = document.getElementById('dep-lines-svg');
+    if (!hasDeps || AppState.compactView) {
+        if (svg) svg.innerHTML = '';
+        return;
+    }
+
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'dep-lines-svg';
+        svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;';
+        ganttRows.style.position = 'relative';
+        ganttRows.appendChild(svg);
+    }
+
+    svg.setAttribute('width',  ganttRows.scrollWidth);
+    svg.setAttribute('height', ganttRows.scrollHeight);
+
+    svg.innerHTML = `<defs>
+        <marker id="dlar-ok" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,1.5 L9,5 L0,8.5 Z" fill="#3b82f6"/>
+        </marker>
+        <marker id="dlar-err" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,1.5 L9,5 L0,8.5 Z" fill="#F46600"/>
+        </marker>
+    </defs>`;
+
+    const cr = ganttRows.getBoundingClientRect();
+
+    AppState.projects.forEach(succ => {
+        if (!succ.deps || !succ.deps.length) return;
+        const succRow = ganttRows.querySelector(`.gantt-row[data-proj-id="${succ.id}"]`);
+        if (!succRow) return;
+        const succFirstBar = succRow.querySelector('.phase-bar.first-phase') || succRow.querySelector('.phase-bar');
+        if (!succFirstBar) return;
+
+        succ.deps.forEach(predId => {
+            const pred = AppState.projects.find(p => p.id === predId);
+            if (!pred) return;
+            const predRow = ganttRows.querySelector(`.gantt-row[data-proj-id="${predId}"]`);
+            if (!predRow) return;
+            const predBars = predRow.querySelectorAll('.phase-bar');
+            if (!predBars.length) return;
+            const predLastBar = predBars[predBars.length - 1];
+
+            const pr = predLastBar.getBoundingClientRect();
+            const sr = succFirstBar.getBoundingClientRect();
+            const x1 = pr.right  - cr.left;
+            const y1 = pr.top    + pr.height / 2 - cr.top;
+            const x2 = sr.left   - cr.left + 12;
+            const y2 = sr.top    + sr.height / 2 - cr.top;
+
+            const isConflict = pred.phaseDetails.length > 0 && succ.phaseDetails.length > 0 &&
+                succ.phaseDetails[0].start < pred.phaseDetails[pred.phaseDetails.length - 1].end;
+
+            const color  = isConflict ? '#F46600' : '#3b82f6';
+            const sw     = isConflict ? '2.2' : '1.8';
+            const dash   = isConflict ? '5,3' : '4,3';
+            const marker = isConflict ? 'url(#dlar-err)' : 'url(#dlar-ok)';
+            const cx     = (x1 + x2) / 2;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', sw);
+            if (dash) path.setAttribute('stroke-dasharray', dash);
+            path.setAttribute('marker-end', marker);
+            svg.appendChild(path);
+        });
+    });
+
+}
+
+function renderAlertBanner() {
+    const el = document.getElementById('alert-banner');
+    if (!el) return;
+    if (sessionStorage.getItem('alert-banner-dismissed')) { el.style.display = 'none'; return; }
+
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const urgent = AppState.projects.filter(p => {
+        const diff = Math.round((new Date(p.open) - now) / MS_PER_DAY);
+        return diff >= 0 && diff <= 14;
+    }).sort((a, b) => new Date(a.open) - new Date(b.open));
+
+    if (!urgent.length) { el.style.display = 'none'; return; }
+
+    const isCollapsed = el.classList.contains('collapsed');
+    el.style.display = '';
+    el.innerHTML = `
+        <div class="alert-banner-header">
+            <span class="alert-banner-icon">⚠</span>
+            <span class="alert-banner-title">마감 임박 알림 — D-14 이내 <strong>${urgent.length}건</strong></span>
+            <div class="alert-banner-actions">
+                <button class="alert-banner-toggle" onclick="toggleAlertBanner()">${isCollapsed ? '펼치기' : '접기'}</button>
+                <button class="alert-banner-close" onclick="dismissAlertBanner()" title="이 세션 동안 닫기">✕</button>
+            </div>
+        </div>
+        <div class="alert-banner-body${isCollapsed ? ' collapsed' : ''}">
+            ${urgent.map(p => {
+                const diff = Math.round((new Date(p.open) - now) / MS_PER_DAY);
+                const cls = diff <= 7 ? 'urgent' : 'warning';
+                const ddayText = diff === 0 ? 'D-Day' : `D-${diff}`;
+                return `<div class="alert-item ${cls}" onclick="editProject(${p.id})" title="클릭하여 수정">
+                    <span class="alert-dday">${ddayText}</span>
+                    <span class="alert-name">${p.name}</span>
+                    <span class="alert-team">${p.team}</span>
+                    <span class="alert-open">${fmtD(p.open)}</span>
+                </div>`;
+            }).join('')}
+        </div>`;
+}
+
+// ── Partial-update caches ──────────────────────────────────────────────────────
+const _ganttCache = new Map(); // projId -> { el, sig }
+const _cardCache  = new Map(); // projId -> { el, sig }
+const _listCache  = new Map(); // projId -> { el, sig, idx }
+
+// Signature captures all fields that affect rendering, plus date and theme
+function _projSig(p) {
+    return document.documentElement.getAttribute('data-theme') + '|' +
+           AppState.currentYear + '|' +
+           new Date().toDateString() + '|' +
+           JSON.stringify(p);
+}
+
+// ── Element builders ───────────────────────────────────────────────────────────
+
+function _buildGanttRowEl(p, rowIdx) {
+    const styles = getStyleSet(p.team);
+    const div = document.createElement('div');
+    div.className = 'gantt-row';
+    div.dataset.team = p.team;
+    div.dataset.projId = p.id;
+    div.style.animation = `fadeSlideLeft 0.38s ${rowIdx * 40}ms ease both`;
+    div.title = '더블클릭하여 수정';
+    div.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.phase-bar')) return;
+        editProject(p.id);
+    });
+    div.innerHTML = `
+        <div class="project-info">
+            <span class="team-tag ${styles.light}" style="font-size:9px; padding:1px 4px;">${p.team}</span>
+            <div class="project-name">${p.name}</div>
+            <div class="project-meta">
+                <span class="project-meta-sep">·</span>
+                ${p.part ? `<span class="pm-val">${p.part}</span><span class="project-meta-sep">·</span>` : ''}
+                <span>담당자 <span class="pm-val">${p.pm}</span></span>
+            </div>
+        </div>
+        <div class="bar-area">${buildBarAreaHtml(p)}</div>`;
+    return div;
+}
+
+function _buildCardHtml(p, cardIdx, q, now) {
+    const styles = getStyleSet(p.team);
+    const openDate = new Date(p.open);
+
+    let activePhase = p.phaseDetails.find(pd => {
+        const s = parseDate(pd.start); const e = parseDate(pd.end); e.setHours(23,59,59);
+        return now >= s && now <= e;
+    });
+    let displayPhase = activePhase;
+    let isGap = false;
+    if (!displayPhase && now >= parseDate(p.phaseDetails[0]?.start) && now < openDate) {
+        displayPhase = p.phaseDetails.find(pd => parseDate(pd.start) > now);
+        if (displayPhase) isGap = true;
+    }
+
+    let statusBg, statusFg, statusTxt;
+    if (activePhase) {
+        statusBg='#dbeafe'; statusFg='#1d4ed8';
+        statusTxt = (activePhase.name.split(':')[1]||activePhase.name).trim() + ' 진행중';
+    } else if (now < parseDate(p.phaseDetails[0]?.start)) {
+        statusBg='#f1f5f9'; statusFg='#64748b'; statusTxt='착수 준비중';
+    } else if (now >= openDate) {
+        statusBg='#d1fae5'; statusFg='#065f46'; statusTxt='개발 완료';
+    } else if (isGap && displayPhase) {
+        statusBg='#ede9fe'; statusFg='#5b21b6';
+        statusTxt = (displayPhase.name.split(':')[1]||displayPhase.name).trim() + ' 준비중';
+    } else {
+        statusBg='#ede9fe'; statusFg='#5b21b6'; statusTxt='오픈 준비중';
+    }
+
+    const openD = new Date(p.open);
+    const diffDays = Math.round((openD - now) / MS_PER_DAY);
+    let ddayText, ddayColor, ddayBg;
+    if (diffDays > 0) {
+        ddayText = `D-${diffDays}`;
+        ddayColor = diffDays <= 7 ? '#dc2626' : diffDays <= 30 ? '#d97706' : '#475569';
+        ddayBg    = diffDays <= 7 ? '#fff1f2' : diffDays <= 30 ? '#fff7ed' : '#f1f5f9';
+    } else if (diffDays === 0) {
+        ddayText = 'D-Day'; ddayColor = '#dc2626'; ddayBg = '#fee2e2';
+    } else {
+        ddayText = `D+${Math.abs(diffDays)}`; ddayColor = '#94a3b8'; ddayBg = '#f1f5f9';
+    }
+
+    const shownPhase = displayPhase;
+    const shownDesc = shownPhase
+        ? shownPhase.desc.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r?\n/g,'<br>') : '';
+    const shownLabel = isGap ? '예정' : '단계';
+
+    const phaseSection = shownPhase ? `
+        <hr class="card-divider">
+        <div class="card-phase-row">
+            <span class="card-phase-name">${(shownPhase.name.split(':')[1]||shownPhase.name).trim()}</span><span style="font-size:0.62rem;color:#94a3b8;font-weight:600;margin:0 5px 0 0;">${shownLabel}</span>
+            <span class="card-phase-date">${fmtD(shownPhase.start)} ~ ${fmtD(shownPhase.end)}</span>
+        </div>
+        ${shownDesc ? `<div class="card-phase-desc" style="margin-top:4px;">${shownDesc}</div>` : ''}` : '';
+
+    const tagsHtml = (p.tags?.length) ? `<div class="card-tags">${p.tags.map(tid => {
+        const tag = PRESET_TAGS.find(t => t.id === tid);
+        return tag ? `<span class="tag-badge" style="background:${tag.bg};color:${tag.fg};">${tag.label}</span>` : '';
+    }).join('')}</div>` : '';
+
+    let totalMonthsStr = '-';
+    let _earliest = null, _latest = null;
+    if (p.phaseDetails && p.phaseDetails.length > 0) {
+        const starts = p.phaseDetails.map(pd => parseDate(pd.start)).filter(d => !isNaN(d));
+        const ends   = p.phaseDetails.map(pd => parseDate(pd.end)).filter(d => !isNaN(d));
+        if (starts.length && ends.length) {
+            _earliest = new Date(Math.min(...starts));
+            const phaseLatest = new Date(Math.max(...ends));
+            const openDate2 = new Date(p.open);
+            _latest = openDate2 > phaseLatest ? openDate2 : phaseLatest;
+            const months = (_latest.getFullYear() - _earliest.getFullYear()) * 12 + (_latest.getMonth() - _earliest.getMonth()) + 1;
+            totalMonthsStr = `${months}개월`;
+        }
+    }
+    const periodLine = (() => {
+        if (!_earliest || !_latest) return '';
+        return `<div style="margin-top:3px;font-size:0.68rem;color:#94a3b8;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-size:0.6rem;font-weight:700;background:#e2e8f0;color:#64748b;padding:1px 5px;border-radius:3px;white-space:nowrap;">총 개발기간</span>${fmtD(_earliest.toISOString().slice(0,10))} ~ ${fmtD(_latest.toISOString().slice(0,10))}<span style="font-size:0.6rem;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:3px;white-space:nowrap;">${totalMonthsStr}</span><span style="font-size:0.6rem;font-weight:700;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;white-space:nowrap;">오픈 ${fmtD(p.open)}</span></div>`;
+    })();
+
+    const clientRow = p.clientDept
+        ? `<span class="card-meta-item"><span class="card-meta-label" style="background:#e2e8f0;color:#475569;">의뢰부서</span><span class="card-meta-value">${hl(p.clientDept, q)}</span></span>` : '';
+
+    const ambientRgba = hexToRgba(statusBg, 0.09);
+    return `<div class="project-card" data-proj-id="${p.id}" style="border-left-color:${styles.hex};background:linear-gradient(150deg,${ambientRgba} 0%,white 38%);animation:cardFadeIn 0.35s ease forwards;animation-delay:${cardIdx * 50}ms" ondblclick="editProject(${p.id})">
+        <div class="card-chk-wrap">
+            <input type="checkbox" class="card-row-chk" data-id="${p.id}" onchange="onCardChkChange(this)" title="선택">
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span class="team-tag ${styles.light}">${hl(p.team, q)}</span>
+            <div style="display:flex;align-items:center;gap:4px;">
+                <span class="dday-badge" style="background:${ddayBg};color:${ddayColor};">${ddayText}</span>
+                <span class="status-tag" style="background:${statusBg};color:${statusFg};">${statusTxt}</span>
+            </div>
+        </div>
+
+        <div class="card-proj-name" style="font-weight:900;font-size:0.95rem;color:var(--text-main);line-height:1.3;">${hl(p.name, q)}</div>
+        ${tagsHtml}
+        ${periodLine}
+
+        ${phaseSection}
+
+        <hr class="card-divider">
+        <div class="card-meta-row">
+            <span class="card-meta-item">
+                <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">파트</span>
+                <span class="card-meta-value">${p.part ? hl(p.part, q) : hl(p.team, q)}</span>
+            </span>
+            <span class="card-meta-item">
+                <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">담당자</span>
+                <span class="card-meta-value">${hl(p.pm, q)}</span>
+            </span>
+            ${clientRow}
+        </div>
+    </div>`;
+}
+
+function _buildCardEl(p, cardIdx, q, now) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _buildCardHtml(p, cardIdx, q, now);
+    return tmp.firstElementChild;
+}
+
+function _buildListRowHtml(p, idx, q, now) {
+    const { text: ddayTxt, cls: ddayCls } = calcDDay(p.open, now);
+    const diff = Math.round((new Date(p.open) - now) / MS_PER_DAY);
+    const openCls = diff < 0 ? 'open-past' : diff <= 30 ? 'open-soon' : 'open-future';
+    const { periodStart, periodEnd, durStr } = calcDuration(p);
+    const curPhase = calcCurPhase(p, now);
+
+    const v = AppState.listColVisible;
+    const td = (key, html) => v[key] ? `<td>${html}</td>` : '';
+    return `<tr data-proj-id="${p.id}" ondblclick="editProject(${p.id})" title="더블클릭하여 수정">
+        <td style="text-align:center;"><input type="checkbox" class="list-row-chk" data-id="${p.id}" onchange="onListChkChange()" style="cursor:pointer;width:14px;height:14px;accent-color:#ef4444;"></td>
+        ${td('no',`<span class="list-no-num">${idx+1}</span>`)}
+        ${td('name',`<span class="list-td-name">${hl(p.name, q)}</span>`)}
+        ${td('team',`<span class="list-team-tag">${hl(p.team, q)}</span>`)}
+        ${td('part',p.part ? hl(p.part, q) : '<span style="color:#BBBBBB;">—</span>')}
+        ${td('pm',hl(p.pm, q))}
+        ${td('client',hl(p.clientDept||'', q))}
+        ${td('period',`<span class="list-period">${periodStart} ~ ${periodEnd}</span>`)}
+        ${td('duration',`<span class="list-duration">${durStr}</span>`)}
+        ${td('dday',`<span class="dday-badge ${ddayCls}">${ddayTxt}</span>`)}
+        ${td('open',`<span class="dday-badge ${openCls}">${fmtD(p.open)}</span>`)}
+        ${td('phase',`<span class="list-phase">${curPhase}</span>`)}
+        ${td('tags', (p.tags?.length ? p.tags.map(tid => { const tag = PRESET_TAGS.find(t=>t.id===tid); return tag ? `<span class="tag-badge" style="background:${tag.bg};color:${tag.fg};">${tag.label}</span>` : ''; }).join(' ') : '<span style="color:#ccc;">—</span>'))}
+    </tr>`;
+}
+
+function _buildListRowEl(p, idx, q, now) {
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = _buildListRowHtml(p, idx, q, now);
+    return tmp.firstElementChild;
+}
+
+// ── Reconcilers ────────────────────────────────────────────────────────────────
+
+function _reconcileGantt(container, filtered) {
+    const newIds = new Set(filtered.map(p => p.id));
+
+    for (const [id, entry] of _ganttCache) {
+        if (!newIds.has(id)) { entry.el.remove(); _ganttCache.delete(id); }
+    }
+
+    [...container.children].forEach(el => { if (!el.dataset.projId) el.remove(); });
+
+    filtered.forEach((p, rowIdx) => {
+        const sig = _projSig(p);
+        let entry = _ganttCache.get(p.id);
+        if (!entry || entry.sig !== sig) {
+            const el = _buildGanttRowEl(p, rowIdx);
+            if (entry) entry.el.remove();
+            entry = { el, sig };
+            _ganttCache.set(p.id, entry);
+        }
+        container.appendChild(entry.el);
+    });
+}
+
+function _reconcileCards(container, filtered, q, now) {
+    const newIds = new Set(filtered.map(p => p.id));
+
+    for (const [id, entry] of _cardCache) {
+        if (!newIds.has(id)) { entry.el.remove(); _cardCache.delete(id); }
+    }
+
+    [...container.children].forEach(el => { if (!el.dataset.projId) el.remove(); });
+
+    filtered.forEach((p, cardIdx) => {
+        const sig = _projSig(p) + '|' + q;
+        let entry = _cardCache.get(p.id);
+        if (!entry || entry.sig !== sig) {
+            const el = _buildCardEl(p, cardIdx, q, now);
+            if (entry) entry.el.remove();
+            entry = { el, sig };
+            _cardCache.set(p.id, entry);
+        }
+        container.appendChild(entry.el);
+    });
+}
+
+function _reconcileList(tbody, sorted, q, now) {
+    const newIds = new Set(sorted.map(p => p.id));
+
+    for (const [id, entry] of _listCache) {
+        if (!newIds.has(id)) { entry.el.remove(); _listCache.delete(id); }
+    }
+
+    [...tbody.children].forEach(el => { if (!el.dataset.projId) el.remove(); });
+
+    sorted.forEach((p, idx) => {
+        const sig = _projSig(p) + '|' + q + '|' + JSON.stringify(AppState.listColVisible);
+        let entry = _listCache.get(p.id);
+        if (!entry || entry.sig !== sig) {
+            const el = _buildListRowEl(p, idx, q, now);
+            if (entry) entry.el.remove();
+            entry = { el, sig, idx };
+            _listCache.set(p.id, entry);
+        } else if (entry.idx !== idx) {
+            const noCell = entry.el.querySelector('.list-no-num');
+            if (noCell) noCell.textContent = idx + 1;
+            entry.idx = idx;
+        }
+        tbody.appendChild(entry.el);
+    });
+}
+
+// ── Dashboard render ───────────────────────────────────────────────────────────
+
 function renderDashboard() {
-    const q = currentSearch.toLowerCase();
-    const filtered = (currentFilter === '전체' ? projects : projects.filter(p => p.team === currentFilter))
+    renderAlertBanner();
+
+    const q = AppState.currentSearch.toLowerCase();
+
+    // 팀 필터 (서버가 이미 연도 필터 완료 → 클라이언트 중복 불필요)
+    const teamFiltered = AppState.currentFilter === '전체'
+        ? AppState.projects
+        : AppState.projects.filter(p => p.team === AppState.currentFilter);
+
+    renderTagFilter(teamFiltered);
+
+    const filtered = teamFiltered
+        .filter(p => !AppState.currentTagFilter || (p.tags || []).includes(AppState.currentTagFilter))
         .filter(p => !q || [p.name, p.pm, p.team, p.part||'', p.clientDept||'',
-            ...(p.phaseDetails||[]).map(pd => pd.name||'')
+            ...(p.phaseDetails||[]).map(pd => pd.name||''),
+            ...(p.tags||[]).map(tid => PRESET_TAGS.find(t => t.id === tid)?.label || tid)
         ].some(v => v.toLowerCase().includes(q)))
         .slice().sort((a, b) => new Date(a.open) - new Date(b.open));
 
     const gc = document.getElementById('gantt-rows');
-    if (gc) gc.classList.toggle('gantt-compact', compactView);
+    if (gc) gc.classList.toggle('gantt-compact', AppState.compactView);
     const now = new Date();
     const todayMidnight = new Date(now); todayMidnight.setHours(0,0,0,0);
 
     const statCount   = filtered.length;
     const statOngoing = filtered.filter(p => new Date(p.open) > todayMidnight).length;
     const statDone    = filtered.filter(p => new Date(p.open) <= todayMidnight).length;
-    const statEarly   = filtered.filter(p => { const d = new Date(p.open); return d.getFullYear() === CURRENT_YEAR && d.getMonth() < 6; }).length;
+    const statEarly   = filtered.filter(p => { const d = new Date(p.open); return d.getFullYear() === AppState.currentYear && d.getMonth() < 6; }).length;
     document.getElementById('detail-count').innerText = `총 ${statCount.toLocaleString()}건`;
-    _countUp('stat-count',     statCount,   v => `${Math.round(v).toLocaleString()}건`, statCount   === 0 ? '#94a3b8' : '');
+    _countUp('stat-count',     statCount,   v => `${Math.round(v).toLocaleString()}건`, statCount   === 0 ? '#94a3b8' : 'var(--primary)');
     _countUp('stat-ongoing',   statOngoing, v => `${Math.round(v).toLocaleString()}건`, statOngoing === 0 ? '#94a3b8' : 'var(--blue)');
     _countUp('stat-done',      statDone,    v => `${Math.round(v).toLocaleString()}건`, statDone    === 0 ? '#94a3b8' : 'var(--emerald)');
     _countUp('stat-early-open', statEarly,  v => `${Math.round(v).toLocaleString()}건`, statEarly   === 0 ? '#94a3b8' : 'var(--emerald)');
 
-    const todayPos = now.getFullYear() === CURRENT_YEAR ? getDatePos(now) : null;
-    // 월별 셀 + 주간 눈금 생성
+    const todayPos = now.getFullYear() === AppState.currentYear ? getDatePos(now) : null;
     let monthHtml = Array.from({length: 12}, (_, i) => {
-        const daysInMonth = new Date(CURRENT_YEAR, i + 1, 0).getDate();
-        // 주간 눈금: 7일 간격으로 tick 위치 계산 (월 내 비율)
+        const daysInMonth = new Date(AppState.currentYear, i + 1, 0).getDate();
         const ticks = [];
         for (let d = 7; d < daysInMonth; d += 7) {
             const pct = (d / daysInMonth * 100).toFixed(2);
-            const isMid = Math.abs(d - Math.round(daysInMonth / 2)) <= 3; // 중간 주(2주차)는 약간 진하게
+            const isMid = Math.abs(d - Math.round(daysInMonth / 2)) <= 3;
             ticks.push(`<div class="week-tick${isMid ? ' mid' : ''}" style="left:${pct}%"></div>`);
         }
-        const isCurrentMonth = now.getFullYear() === CURRENT_YEAR && now.getMonth() === i;
+        const isCurrentMonth = now.getFullYear() === AppState.currentYear && now.getMonth() === i;
         return `<div class="month-cell${isCurrentMonth ? ' current-month-col' : ''}"><span class="month-label">${i+1}월</span><div class="week-ticks">${ticks.join('')}</div></div>`;
     }).join('');
     if (todayPos !== null) monthHtml += `<div class="today-line" style="left: ${todayPos}%;"><div class="today-dot"></div></div>`;
@@ -91,269 +517,53 @@ function renderDashboard() {
         <button class="empty-state-btn" onclick="setFilter('전체');document.getElementById('search-input').value='';setSearch('');">전체 보기로 돌아가기</button>
     </div>`;
 
+    const ganttContainer = document.getElementById('gantt-rows');
+    const cardContainer  = document.getElementById('card-grid');
+
     if (!filtered.length) {
-        const msg = currentSearch ? `'${currentSearch}' 검색 결과가 없습니다` : `${currentFilter} 팀의 프로젝트가 없습니다`;
-        document.getElementById('gantt-rows').innerHTML = emptyHtml(msg);
-        document.getElementById('card-grid').innerHTML = emptyHtml(msg);
-        if (currentView === 'list') document.getElementById('list-view').innerHTML = emptyHtml(msg);
+        const msg = AppState.currentSearch ? `'${AppState.currentSearch}' 검색 결과가 없습니다` : `${AppState.currentFilter} 팀의 프로젝트가 없습니다`;
+        _ganttCache.forEach(({el}) => { if (el.parentNode) el.remove(); });
+        _cardCache.forEach(({el}) => { if (el.parentNode) el.remove(); });
+        ganttContainer.innerHTML = emptyHtml(msg);
+        cardContainer.innerHTML  = emptyHtml(msg);
+        if (AppState.currentView === 'list') {
+            _listCache.forEach(({el}) => { if (el.parentNode) el.remove(); });
+            document.getElementById('list-view').innerHTML = emptyHtml(msg);
+        }
         return;
     }
 
-    const ganttHtml = filtered.map((p, rowIdx) => {
-        const styles = getStyleSet(p.team);
-        // 오픈일이 올해 이후 연도이면 차트 끝(100%)에 깃발 표시
-        const openDateObj = parseDate(p.open);
-        const isFutureOpen = openDateObj.getFullYear() > CURRENT_YEAR;
-        const endPos = isFutureOpen ? 100 : getDatePos(p.open);
-        const bars = p.phaseDetails.map((pd, idx) => {
-            const pdStartDate = parseDate(pd.start);
-            const pdEndDate   = parseDate(pd.end);
-            // 단계 시작일이 올해보다 미래이면 차트에 표시 안 함
-            if (pdStartDate.getFullYear() > CURRENT_YEAR) return '';
-            const startX = getDatePos(pd.start);
-            const nextPd = p.phaseDetails[idx + 1];
-            const naturalEnd = getDatePos(pd.end);
-            // 단계 종료일이 올해를 넘어가면 차트 끝에서 자름
-            const endsNextYear = pdEndDate.getFullYear() > CURRENT_YEAR;
-            const nextStart = (nextPd && parseDate(nextPd.start).getFullYear() <= CURRENT_YEAR) ? getDatePos(nextPd.start) : null;
-            const endX = endsNextYear ? 100 : naturalEnd;
-            const widthX = Math.max(0.3, endX - startX);
-            const widthStyle = `${widthX}%`;
-            const safeDesc = pd.desc
-                .replace(/\\/g, '\\\\')
-                .replace(/'/g, "\\'")
-                .replace(/\r?\n/g, '\\n')
-                .replace(/&/g, '&amp;')
-                .replace(/"/g, '&quot;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-            const pdStart = pdStartDate;
-            const pdEnd   = new Date(pdEndDate); pdEnd.setHours(23,59,59);
-            const phaseState = now > pdEnd ? 'phase-done' : (now >= pdStart ? 'phase-active' : '');
-            const continuesCls = endsNextYear ? ' phase-continues' : '';
-            const barLabel = pd.name.split(':')[1] || pd.name;
-            const safeBarLabel = barLabel.replace(/"/g, '&quot;');
-            const safeBarDesc = (pd.desc || '').replace(/"/g, '&quot;').replace(/\r?\n/g, ' ');
-            return `<div class="phase-bar ${idx === 0 ? 'first-phase' : ''} ${phaseState}${continuesCls}" data-pname="${safeBarLabel}" data-start="${pd.start}" data-end="${pd.end}" data-desc="${safeBarDesc}" data-proj-id="${p.id}" data-phase-idx="${idx}" style="left: ${startX}%; width: ${widthStyle}; background-color: ${resolveColor(pd.color)}; background-image: linear-gradient(to bottom, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 50%, rgba(0,0,0,0.08) 100%);">${barLabel}</div>`;
-        }).join('');
-
-        return `<div class="gantt-row" data-team="${p.team}" data-proj-id="${p.id}" style="animation:fadeSlideLeft 0.38s ${rowIdx * 40}ms ease both;">
-            <div class="project-info">
-                <span class="team-tag ${styles.light}" style="font-size:9px; padding:1px 4px;">${p.team}</span>
-                <div class="project-name">${p.name}</div>
-                <div class="project-meta">
-                    <span class="project-meta-sep">·</span>
-                    ${p.part ? `<span class="pm-val">${p.part}</span><span class="project-meta-sep">·</span>` : ''}
-                    <span>담당자 <span class="pm-val">${p.pm}</span></span>
-                </div>
-            </div>
-            <div class="bar-area">
-                ${Array.from({length: 12}, (_, mi) => { const isCur = now.getFullYear() === CURRENT_YEAR && now.getMonth() === mi; return `<div class="grid-line${isCur ? ' current-month-bar' : ''}"></div>`; }).join('')}
-                ${todayPos !== null ? `<div class="past-overlay" style="width: ${todayPos}%;"></div><div class="today-line" style="left: ${todayPos}%;"></div>` : ''}
-                ${bars}
-                <div class="milestone" style="left:${isFutureOpen ? 'calc(100% + 8px)' : endPos + '%'};"><span class="open-beacon"><span class="open-beacon-ring"></span><span class="open-beacon-ring"></span><span class="open-beacon-dot"></span></span>${formatOpenTag(p.open)}</div>
-            </div>
-        </div>`;
-    }).join('');
-
-    const cardHtml = filtered.map((p, cardIdx) => {
-        const styles = getStyleSet(p.team);
-        const openDate = new Date(p.open);
-
-        /* ── 단계 상태 판별 ── */
-        let activePhase = p.phaseDetails.find(pd => {
-            const s = parseDate(pd.start); const e = parseDate(pd.end); e.setHours(23,59,59);
-            return now >= s && now <= e;
-        });
-        // gap 구간이면 다음 단계를 표시용으로 사용
-        let displayPhase = activePhase;
-        let isGap = false;
-        if (!displayPhase && now >= parseDate(p.phaseDetails[0]?.start) && now < openDate) {
-            displayPhase = p.phaseDetails.find(pd => parseDate(pd.start) > now);
-            if (displayPhase) isGap = true;
-        }
-
-        /* ── 상태 뱃지 (시맨틱 컬러) ── */
-        let statusBg, statusFg, statusTxt;
-        if (activePhase) {
-            statusBg='#dbeafe'; statusFg='#1d4ed8';   // 진행중 → 파랑
-            statusTxt = (activePhase.name.split(':')[1]||activePhase.name).trim() + ' 진행중';
-        } else if (now < parseDate(p.phaseDetails[0]?.start)) {
-            statusBg='#f1f5f9'; statusFg='#64748b'; statusTxt='착수 준비중';  // 회색
-        } else if (now >= openDate) {
-            statusBg='#d1fae5'; statusFg='#065f46'; statusTxt='개발 완료';    // 초록
-        } else if (isGap && displayPhase) {
-            statusBg='#ede9fe'; statusFg='#5b21b6';
-            statusTxt = (displayPhase.name.split(':')[1]||displayPhase.name).trim() + ' 준비중'; // 보라
-        } else {
-            statusBg='#ede9fe'; statusFg='#5b21b6'; statusTxt='오픈 준비중';  // 보라
-        }
-
-        /* ── D-Day 계산 ── */
-        const openD = new Date(p.open);
-        const diffDays = Math.round((openD - now) / 86400000);
-        let ddayText, ddayColor, ddayBg;
-        if (diffDays > 0) {
-            ddayText = `D-${diffDays}`;
-            ddayColor = diffDays <= 7 ? '#dc2626' : diffDays <= 30 ? '#d97706' : '#475569';
-            ddayBg    = diffDays <= 7 ? '#fff1f2' : diffDays <= 30 ? '#fff7ed' : '#f1f5f9';
-        } else if (diffDays === 0) {
-            ddayText = 'D-Day'; ddayColor = '#dc2626'; ddayBg = '#fee2e2';
-        } else {
-            ddayText = `D+${Math.abs(diffDays)}`; ddayColor = '#94a3b8'; ddayBg = '#f1f5f9';
-        }
-
-        /* ── 현재/다음 단계 행 ── */
-        const shownPhase = displayPhase;
-        const shownDesc = shownPhase
-            ? shownPhase.desc.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r?\n/g,'<br>') : '';
-        const shownLabel = isGap ? '예정' : '단계';
-
-        const phaseSection = shownPhase ? `
-            <hr class="card-divider">
-            <div class="card-phase-row">
-                <span class="card-phase-name">${(shownPhase.name.split(':')[1]||shownPhase.name).trim()}</span><span style="font-size:0.62rem;color:#94a3b8;font-weight:600;margin:0 5px 0 0;">${shownLabel}</span>
-                <span class="card-phase-date">${fmtD(shownPhase.start)} ~ ${fmtD(shownPhase.end)}</span>
-            </div>
-            ${shownDesc ? `<div class="card-phase-desc" style="margin-top:4px;">${shownDesc}</div>` : ''}` : '';
-
-        /* ── 총 개발기간 계산 ── */
-        let totalMonthsStr = '-';
-        let _earliest = null, _latest = null;
-        if (p.phaseDetails && p.phaseDetails.length > 0) {
-            const starts = p.phaseDetails.map(pd => parseDate(pd.start)).filter(d => !isNaN(d));
-            const ends   = p.phaseDetails.map(pd => parseDate(pd.end)).filter(d => !isNaN(d));
-            if (starts.length && ends.length) {
-                _earliest = new Date(Math.min(...starts));
-                const phaseLatest = new Date(Math.max(...ends));
-                const openDate = new Date(p.open);
-                _latest = openDate > phaseLatest ? openDate : phaseLatest;
-                const months = (_latest.getFullYear() - _earliest.getFullYear()) * 12 + (_latest.getMonth() - _earliest.getMonth()) + 1;
-                totalMonthsStr = `${months}개월`;
-            }
-        }
-        const periodLine = (() => {
-            if (!_earliest || !_latest) return '';
-            return `<div style="margin-top:3px;font-size:0.68rem;color:#94a3b8;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><span style="font-size:0.6rem;font-weight:700;background:#e2e8f0;color:#64748b;padding:1px 5px;border-radius:3px;white-space:nowrap;">총 개발기간</span>${fmtD(_earliest.toISOString().slice(0,10))} ~ ${fmtD(_latest.toISOString().slice(0,10))}<span style="font-size:0.6rem;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:3px;white-space:nowrap;">${totalMonthsStr}</span></div>`;
-        })();
-
-        /* ── 담당 정보 ── */
-        const clientRow = p.clientDept
-            ? `<span class="card-meta-item"><span class="card-meta-label" style="background:#e2e8f0;color:#475569;">의뢰부서</span><span class="card-meta-value">${hl(p.clientDept, q)}</span></span>` : '';
-
-        const ambientRgba = hexToRgba(statusBg, 0.09);
-        return `<div class="project-card" style="border-left-color:${styles.hex};background:linear-gradient(150deg,${ambientRgba} 0%,white 38%);animation:cardFadeIn 0.35s ease forwards;animation-delay:${cardIdx * 50}ms" ondblclick="editProject(${p.id})">
-            <div class="card-chk-wrap">
-                <input type="checkbox" class="card-row-chk" data-id="${p.id}" onchange="onCardChkChange(this)" title="선택">
-            </div>
-
-            <!-- ① 헤더: 팀 + D-Day + 상태 -->
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-                <span class="team-tag ${styles.light}">${hl(p.team, q)}</span>
-                <div style="display:flex;align-items:center;gap:4px;">
-                    <span class="dday-badge" style="background:${ddayBg};color:${ddayColor};">${ddayText}</span>
-                    <span class="status-tag" style="background:${statusBg};color:${statusFg};">${statusTxt}</span>
-                </div>
-            </div>
-
-            <!-- ② 프로젝트명 -->
-            <div style="font-weight:900;font-size:0.95rem;color:var(--text-main);line-height:1.3;">${hl(p.name, q)}</div>
-            ${periodLine}
-
-            <!-- ③ 현재 단계 (활성 시만 표시) -->
-            ${phaseSection}
-
-            <!-- ④ 담당 정보 -->
-            <hr class="card-divider">
-            <div class="card-meta-row">
-                <span class="card-meta-item">
-                    <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">파트</span>
-                    <span class="card-meta-value">${p.part ? hl(p.part, q) : hl(p.team, q)}</span>
-                </span>
-                <span class="card-meta-item">
-                    <span class="card-meta-label" style="background:#e2e8f0;color:#475569;">담당자</span>
-                    <span class="card-meta-value">${hl(p.pm, q)}</span>
-                </span>
-                ${clientRow}
-            </div>
-
-            <!-- ⑤ 핵심 지표: 적용예정일 -->
-            <div class="card-footer-metrics" style="margin-top:7px;grid-template-columns:1fr;">
-                <div class="card-metric open">
-                    <div class="card-metric-label">적용예정일</div>
-                    <div class="card-metric-value">${fmtD(p.open)}</div>
-                </div>
-            </div>
-
-
-        </div>`;
-    }).join('');
-
-    // DOM 쓰기를 단일 rAF 프레임에 일괄 처리 → 끊김 없는 트랜지션
     requestAnimationFrame(() => {
-        document.getElementById('gantt-rows').innerHTML = ganttHtml;
-        document.getElementById('card-grid').innerHTML = cardHtml;
-        if (currentView === 'list') renderListView(filtered, now);
-        // 레이아웃 완료 후 두 번째 프레임에서 측정해야 offsetWidth가 정확함
-        requestAnimationFrame(autoFitBarFonts);
+        _reconcileGantt(ganttContainer, filtered);
+        _reconcileCards(cardContainer, filtered, q, now);
+        if (AppState.currentView === 'list') renderListView(filtered, now);
+        requestAnimationFrame(() => { autoFitBarFonts(); autoFitCardTitles(); drawDepLines(); });
     });
 }
 
 /* ── 목록뷰 렌더 ── */
 function renderListView(filtered, now) {
-    const q = currentSearch.toLowerCase();
+    const q = AppState.currentSearch.toLowerCase();
+    const container = document.getElementById('list-view');
+
     if (!filtered.length) {
-        document.getElementById('list-view').innerHTML = '<div class="list-no-data">조회된 프로젝트가 없습니다. 검색어 또는 필터 조건을 확인해 주세요.</div>';
+        _listCache.forEach(({el}) => { if (el.parentNode) el.remove(); });
+        container.innerHTML = '<div class="list-no-data">조회된 프로젝트가 없습니다. 검색어 또는 필터 조건을 확인해 주세요.</div>';
         return;
     }
 
-    // 정렬 적용
     let sorted = filtered.slice();
-    if (listSortCol) {
-        const col = LIST_COLS.find(c => c.key === listSortCol);
-        if (col?.sortFn) sorted.sort((a,b) => listSortDir * col.sortFn(a, b));
+    if (AppState.listSortCol) {
+        const col = LIST_COLS.find(c => c.key === AppState.listSortCol);
+        if (col?.sortFn) sorted.sort((a,b) => AppState.listSortDir * col.sortFn(a, b));
     }
 
-    const rows = sorted.map((p, idx) => {
-        // D-Day
-        const { text: ddayTxt, cls: ddayCls } = calcDDay(p.open, now);
-        const diff = Math.round((new Date(p.open) - now) / 86400000);
-
-        // 오픈일 클래스
-        const openCls = diff < 0 ? 'open-past' : diff <= 30 ? 'open-soon' : 'open-future';
-
-        // 총 개발기간
-        const { periodStart, periodEnd, durStr } = calcDuration(p);
-
-        // 현재 단계
-        const curPhase = calcCurPhase(p, now);
-
-        // 컬럼 가시성에 따라 td 생성
-        const v = listColVisible;
-        const td = (key, html) => v[key] ? `<td>${html}</td>` : '';
-        return `<tr ondblclick="editProject(${p.id})" title="더블클릭하여 수정">
-            <td style="text-align:center;"><input type="checkbox" class="list-row-chk" data-id="${p.id}" onchange="onListChkChange()" style="cursor:pointer;width:14px;height:14px;accent-color:#ef4444;"></td>
-            ${td('no',`<span class="list-no-num">${idx+1}</span>`)}
-            ${td('name',`<span class="list-td-name">${hl(p.name, q)}</span>`)}
-            ${td('team',`<span class="list-team-tag">${hl(p.team, q)}</span>`)}
-            ${td('part',p.part ? hl(p.part, q) : '<span style="color:#BBBBBB;">—</span>')}
-            ${td('pm',hl(p.pm, q))}
-            ${td('client',hl(p.clientDept||'', q))}
-            ${td('period',`<span class="list-period">${periodStart} ~ ${periodEnd}</span>`)}
-            ${td('duration',`<span class="list-duration">${durStr}</span>`)}
-            ${td('dday',`<span class="dday-badge ${ddayCls}">${ddayTxt}</span>`)}
-            ${td('open',`<span class="dday-badge ${openCls}">${fmtD(p.open)}</span>`)}
-            ${td('phase',`<span class="list-phase">${curPhase}</span>`)}
-        </tr>`;
-    }).join('');
-
-    // 헤더 생성
     const sortClass = key => {
-        if (listSortCol !== key) return '';
-        return listSortDir === 1 ? ' asc' : ' desc';
+        if (AppState.listSortCol !== key) return '';
+        return AppState.listSortDir === 1 ? ' asc' : ' desc';
     };
     const th = (key, label, sortable=true) => {
-        if (!listColVisible[key]) return '';
+        if (!AppState.listColVisible[key]) return '';
         const col = LIST_COLS.find(c=>c.key===key);
         const canSort = sortable && col?.sortFn;
         return canSort
@@ -361,32 +571,43 @@ function renderListView(filtered, now) {
             : `<th>${label}</th>`;
     };
 
-    document.getElementById('list-view').innerHTML = `
-        <table class="list-table">
-            <thead><tr>
-                <th style="width:32px;"><input type="checkbox" id="list-chk-all" onchange="toggleAllListChk(this.checked)" style="cursor:pointer;width:14px;height:14px;accent-color:#ef4444;"></th>
-                ${th('no','No',false)}
-                ${th('name','프로젝트명')}
-                ${th('team','팀명')}
-                ${th('part','담당파트')}
-                ${th('pm','담당자')}
-                ${th('client','의뢰부서')}
-                ${th('period','개발기간(시작~종료)',false)}
-                ${th('duration','총개발기간',false)}
-                ${th('dday','D-Day')}
-                ${th('open','적용예정일')}
-                ${th('phase','현재단계',false)}
-            </tr></thead>
-            <tbody>${rows}</tbody>
-        </table>`;
+    const theadHtml = `<tr>
+        <th style="width:32px;"><input type="checkbox" id="list-chk-all" onchange="toggleAllListChk(this.checked)" style="cursor:pointer;width:14px;height:14px;accent-color:#ef4444;"></th>
+        ${th('no','No',false)}
+        ${th('name','프로젝트명')}
+        ${th('team','팀명')}
+        ${th('part','담당파트')}
+        ${th('pm','담당자')}
+        ${th('client','의뢰부서')}
+        ${th('period','개발기간(시작~종료)',false)}
+        ${th('duration','총개발기간',false)}
+        ${th('dday','D-Day')}
+        ${th('open','적용예정일')}
+        ${th('phase','현재단계',false)}
+        ${th('tags','태그',false)}
+    </tr>`;
 
+    let table = container.querySelector('table.list-table');
+    if (!table) {
+        table = document.createElement('table');
+        table.className = 'list-table';
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+
+    let thead = table.querySelector('thead');
+    if (!thead) { thead = document.createElement('thead'); table.insertBefore(thead, table.firstChild); }
+    thead.innerHTML = theadHtml;
+
+    let tbody = table.querySelector('tbody');
+    if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
+
+    _reconcileList(tbody, sorted, q, now);
 }
 
-function drawDepLines() { /* 의존성 라인 비활성화 */ }
-
 function sortListBy(key) {
-    if (listSortCol === key) listSortDir *= -1;
-    else { listSortCol = key; listSortDir = 1; }
+    if (AppState.listSortCol === key) AppState.listSortDir *= -1;
+    else { AppState.listSortCol = key; AppState.listSortDir = 1; }
     renderDashboard();
 }
 
@@ -397,14 +618,12 @@ function toggleColPanel() {
         panel.classList.remove('open');
         return;
     }
-    // 체크박스 목록 생성 (No 제외)
     panel.innerHTML = LIST_COLS.filter(c=>c.key!=='no').map(c=>`
         <label>
-            <input type="checkbox" ${listColVisible[c.key]?'checked':''} onchange="toggleListCol('${c.key}',this.checked)">
+            <input type="checkbox" ${AppState.listColVisible[c.key]?'checked':''} onchange="toggleListCol('${c.key}',this.checked)">
             ${c.label}
         </label>`).join('');
     panel.classList.add('open');
-    // 외부 클릭 시 닫기
     setTimeout(()=>{
         const close = e=>{ if(!wrap.contains(e.target)){ panel.classList.remove('open'); document.removeEventListener('click',close); }};
         document.addEventListener('click', close);
@@ -412,33 +631,35 @@ function toggleColPanel() {
 }
 
 function toggleListCol(key, visible) {
-    listColVisible[key] = visible;
+    AppState.listColVisible[key] = visible;
     renderDashboard();
 }
 
-/* ── 엑셀 내보내기 (SpreadsheetML) ── */
+function autoFitCardTitles() {
+    document.querySelectorAll('.card-proj-name').forEach(el => {
+        el.style.fontSize = '';
+        const MIN_FS = 11;
+        let fs = parseFloat(getComputedStyle(el).fontSize);
+        while (fs > MIN_FS) {
+            const lh = parseFloat(getComputedStyle(el).lineHeight);
+            if (el.scrollHeight <= Math.ceil(lh) + 2) break;
+            fs -= 0.5;
+            el.style.fontSize = fs + 'px';
+        }
+    });
+}
+
 function autoFitBarFonts() {
     document.querySelectorAll('.phase-bar').forEach(bar => {
         const w = bar.offsetWidth;
         if (w <= 0) return;
-        if (w < 16) {
-            bar.style.fontSize = '0';
-            bar.style.padding = '0';
-        } else if (w < 28) {
-            bar.style.fontSize = '0.44rem';
-            bar.style.padding = '0 2px';
-        } else if (w < 45) {
-            bar.style.fontSize = '0.52rem';
-            bar.style.padding = '0 4px';
-        } else if (w < 70) {
-            bar.style.fontSize = '0.6rem';
-            bar.style.padding = '';
-        } else if (w < 95) {
-            bar.style.fontSize = '0.72rem';
-            bar.style.padding = '';
+        const step = BAR_FONT_STEPS.find(s => w < s.maxW);
+        if (step) {
+            bar.style.fontSize = step.fontSize;
+            bar.style.padding  = step.padding;
         } else {
             bar.style.fontSize = '';
-            bar.style.padding = '';
+            bar.style.padding  = '';
         }
     });
 }

@@ -14,7 +14,7 @@
     --phase-2: #FFBC00;
     --phase-3: #FD9C26;
     --phase-4: #FF7A1A;
-    --phase-5: #B09A8A;
+    --phase-5: #E05A00;
 }
 
 /* 기본 */
@@ -129,7 +129,7 @@
 
 /* 상단 타이틀 */
 [data-theme="dark"] .header-title h1 { color: #E8E8E8; }
-[data-theme="dark"] .header-title .sub-tag { color: #FFD338; }
+[data-theme="dark"] .header-title .sub-tag { color: #E8A052; }
 
 /* 섹션 헤더 */
 [data-theme="dark"] .section-header-title { color: #E8E8E8; }
@@ -216,15 +216,15 @@
 [data-theme="dark"] .stepper-header { background: #222225; border-color: #545860; }
 [data-theme="dark"] .stepper-circle { background: #545860; color: #999999; border-color: transparent; }
 [data-theme="dark"] .stepper-step.active .stepper-circle { background: #F46600; color: white; box-shadow: 0 0 0 4px rgba(244,102,0,0.18); border-color: #c95800; }
-[data-theme="dark"] .stepper-step.done .stepper-circle { background: #10b981; color: white; border-color: #059669; }
+[data-theme="dark"] .stepper-step.done .stepper-circle { background: #F46600; color: white; border-color: #c95800; }
 [data-theme="dark"] .stepper-label { color: #777777; }
 [data-theme="dark"] .stepper-step.active .stepper-label { color: #FFD338; }
-[data-theme="dark"] .stepper-step.done .stepper-label { color: #34d399; }
+[data-theme="dark"] .stepper-step.done .stepper-label { color: #FF7A1A; }
 [data-theme="dark"] .stepper-line { background: #545860; }
-[data-theme="dark"] .stepper-line.done { background: #10b981; }
+[data-theme="dark"] .stepper-line.done { background: #F46600; }
 [data-theme="dark"] .stepper-nav { border-top-color: #545860; }
-[data-theme="dark"] .btn-step-back { background: #3F3F42; border-color: #545860; color: #999999; }
-[data-theme="dark"] .btn-step-back:hover { background: #4A4A4E; color: #E8E8E8; }
+[data-theme="dark"] .btn-step-back { background: linear-gradient(135deg, #2d2d31, #26262a); border-color: #545860; color: #94a3b8; box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+[data-theme="dark"] .btn-step-back:hover { background: linear-gradient(135deg, #38383d, #2e2e33); border-color: #6b7280; color: #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
 
 /* 단계 블록 */
 [data-theme="dark"] .phase-block { box-shadow: none; border-color: #545860; }
@@ -347,3 +347,39 @@
 
 /* ── 인쇄 전용 보고서 헤더 ── */
 .print-report-header { display: none; }
+
+/* ── 마감 임박 알림 배너 (다크) ── */
+[data-theme="dark"] .alert-banner { background: linear-gradient(135deg, #3a1a1a 0%, #3a2210 100%); border-color: #7f1d1d; }
+[data-theme="dark"] .alert-banner-header { background: rgba(127,29,29,0.3); border-bottom-color: #7f1d1d; }
+[data-theme="dark"] .alert-banner-title { color: #fca5a5; }
+[data-theme="dark"] .alert-banner-title strong { color: #f87171; }
+[data-theme="dark"] .alert-banner-toggle,
+[data-theme="dark"] .alert-banner-close { border-color: #7f1d1d; color: #fca5a5; }
+[data-theme="dark"] .alert-banner-toggle:hover,
+[data-theme="dark"] .alert-banner-close:hover { background: rgba(127,29,29,0.4); }
+[data-theme="dark"] .alert-item.urgent  { background: rgba(127,29,29,0.35); border-color: #7f1d1d; }
+[data-theme="dark"] .alert-item.urgent:hover  { background: rgba(127,29,29,0.5); }
+[data-theme="dark"] .alert-item.warning { background: rgba(120,53,15,0.35); border-color: #92400e; }
+[data-theme="dark"] .alert-item.warning:hover { background: rgba(120,53,15,0.5); }
+[data-theme="dark"] .alert-item.urgent  .alert-dday { color: #f87171; }
+[data-theme="dark"] .alert-item.warning .alert-dday { color: #fb923c; }
+[data-theme="dark"] .alert-name { color: #e2e8f0; }
+[data-theme="dark"] .alert-team,
+[data-theme="dark"] .alert-open { color: #64748b; }
+
+/* ── 태그 필터/뱃지 (다크) ── */
+[data-theme="dark"] .tag-filter-label { color: #64748b; }
+[data-theme="dark"] .tag-filter-sep { background: #3a3f4b; }
+[data-theme="dark"] .tag-filter-clear { background: #3F3F42 !important; color: #94a3b8 !important; border-color: #545860 !important; }
+
+/* ── 연도 선택기 (다크) ── */
+[data-theme="dark"] .year-selector {
+    background: linear-gradient(145deg, #1e1e22 0%, #16161a 100%);
+    border-color: rgba(255,211,56,0.32);
+    box-shadow: 0 2px 14px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+[data-theme="dark"] .year-btn { color: rgba(255,211,56,0.55); }
+[data-theme="dark"] .year-btn:hover { background: rgba(255,211,56,0.1); color: #FFD338; }
+[data-theme="dark"] .year-display { color: #FFD338; }
+[data-theme="dark"] .year-unit { color: #FFD338; }
+
