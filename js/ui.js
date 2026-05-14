@@ -148,6 +148,7 @@ function toggleCompact() {
     const gc = document.getElementById('gantt-rows');
     if (gc) gc.classList.toggle('gantt-compact', AppState.compactView);
     drawDepLines();
+    requestAnimationFrame(autoFitBarFonts);
 }
 
 function onListChkChange() {
@@ -219,6 +220,17 @@ function setFilter(team) { AppState.currentFilter = team; document.querySelector
 function setTagFilter(tagId) {
     AppState.currentTagFilter = AppState.currentTagFilter === tagId ? null : tagId;
     renderDashboard();
+}
+
+function updateTeamFilterCounts() {
+    const counts = {};
+    AppState.projects.forEach(p => { counts[p.team] = (counts[p.team] || 0) + 1; });
+    const total = AppState.projects.length;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        const team = btn.dataset.team;
+        const count = team === '전체' ? total : (counts[team] || 0);
+        btn.innerHTML = `${team}<span class="tag-count">${count}</span>`;
+    });
 }
 
 function renderTagFilter(projects) {

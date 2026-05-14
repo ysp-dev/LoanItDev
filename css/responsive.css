@@ -124,9 +124,12 @@
     /* 세로모드와 동일하게 숨김 */
     .header-search { display: none; }
     .header-saved-info { display: none; }
-    .nav-io-group { display: none; }
     .nav-tabs .live-clock-container { display: none; }
     .nav-sep { display: none; }
+
+    /* 가로모드: 가져오기/내보내기 컴팩트하게 표시 */
+    .nav-io-group { display: flex; gap: 3px; }
+    .nav-tabs .io-btn { padding: 3px 7px; font-size: 0.64rem; }
 
     /* 다크모드 버튼 오른쪽 끝 */
     .nav-tabs .theme-toggle { margin-left: auto; }

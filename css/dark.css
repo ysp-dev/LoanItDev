@@ -9,12 +9,12 @@
     --border-color:#545860;        /* KB DarkBlue Light */
     --white:       #3F3F42;        /* KB DarkBlue — 카드 배경 */
     --chart-text:  #FFFFFF;
-    /* 단계 막대 — 다크모드도 KB Yellow/Orange 계열 유지 (어두운 배경에서 잘 보임) */
-    --phase-1: #FFD338;
-    --phase-2: #FFBC00;
-    --phase-3: #FD9C26;
-    --phase-4: #FF7A1A;
-    --phase-5: #E05A00;
+    /* 단계 막대 — 다크모드 Blue 계열 (밝은→깊은 파랑) */
+    --phase-1: #4eacf8;
+    --phase-2: #2e96f2;
+    --phase-3: #1480e4;
+    --phase-4: #086ed2;
+    --phase-5: #055dc0;
 }
 
 /* 기본 */

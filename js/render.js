@@ -158,7 +158,7 @@ function renderAlertBanner() {
     const now = new Date(); now.setHours(0, 0, 0, 0);
     const urgent = AppState.projects.filter(p => {
         const diff = Math.round((new Date(p.open) - now) / MS_PER_DAY);
-        return diff >= 0 && diff <= 14;
+        return diff >= 0 && diff <= 10;
     }).sort((a, b) => new Date(a.open) - new Date(b.open));
 
     if (!urgent.length) { el.style.display = 'none'; return; }
@@ -168,7 +168,7 @@ function renderAlertBanner() {
     el.innerHTML = `
         <div class="alert-banner-header">
             <span class="alert-banner-icon">⚠</span>
-            <span class="alert-banner-title">마감 임박 알림 — D-14 이내 <strong>${urgent.length}건</strong></span>
+            <span class="alert-banner-title">마감 임박 알림 — D-10 이내 <strong>${urgent.length}건</strong></span>
             <div class="alert-banner-actions">
                 <button class="alert-banner-toggle" onclick="toggleAlertBanner()">${isCollapsed ? '펼치기' : '접기'}</button>
                 <button class="alert-banner-close" onclick="dismissAlertBanner()" title="이 세션 동안 닫기">✕</button>
@@ -471,6 +471,7 @@ function renderDashboard() {
         : AppState.projects.filter(p => p.team === AppState.currentFilter);
 
     renderTagFilter(teamFiltered);
+    updateTeamFilterCounts();
 
     const filtered = teamFiltered
         .filter(p => !AppState.currentTagFilter || (p.tags || []).includes(AppState.currentTagFilter))
@@ -653,14 +654,37 @@ function autoFitBarFonts() {
     document.querySelectorAll('.phase-bar').forEach(bar => {
         const w = bar.offsetWidth;
         if (w <= 0) return;
-        const step = BAR_FONT_STEPS.find(s => w < s.maxW);
-        if (step) {
+
+        // 3일 이하: 단계명 불필요, 숨김
+        const days = (bar.dataset.start && bar.dataset.end)
+            ? Math.round((new Date(bar.dataset.end) - new Date(bar.dataset.start)) / 86400000) + 1
+            : Infinity;
+        if (days <= 3) {
+            bar.style.fontSize = '0';
+            bar.style.padding  = '0';
+            return;
+        }
+
+        // inline 스타일 초기화 → CSS 기본값으로 복귀
+        bar.style.fontSize = '';
+        bar.style.padding  = '';
+
+        // 텍스트가 넘치지 않으면 그대로
+        if (bar.scrollWidth <= bar.clientWidth) return;
+
+        // 넘치면 단계적으로 축소, 최소 0.44rem 유지 (숨기지 않음)
+        const steps = [
+            { fontSize: '0.72rem', padding: '' },
+            { fontSize: '0.6rem',  padding: '' },
+            { fontSize: '0.52rem', padding: '0 4px' },
+            { fontSize: '0.44rem', padding: '0 2px' },
+        ];
+        for (const step of steps) {
             bar.style.fontSize = step.fontSize;
             bar.style.padding  = step.padding;
-        } else {
-            bar.style.fontSize = '';
-            bar.style.padding  = '';
+            if (bar.scrollWidth <= bar.clientWidth) break;
         }
+        // 0.44rem에서도 넘치면 말줄임(…)으로 처리 (CSS text-overflow 유지)
     });
 }
 
