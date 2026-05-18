@@ -28,9 +28,20 @@ function _initSocket() {
         });
 
         // 다른 사용자가 저장한 데이터를 즉시 반영
-        _socket.on('projects_updated', ({ year, projects }) => {
+        _socket.on('projects_updated', ({ year, projects, from_localhost, action_label, etag }) => {
+            // year === null: 전체 초기화 — 현재 연도 데이터를 비운다
+            if (year === null || year === undefined) {
+                if (etag) AppState.dataVersion = etag;
+                AppState.projects = [];
+                renderDashboard();
+                showMsg('관리자가 전체 데이터를 초기화했습니다.');
+                return;
+            }
             if (year !== AppState.currentYear) return; // 다른 연도는 무시
             if (!Array.isArray(projects)) return;
+            // 어드민 편집 중에는 AppState를 덮어쓰지 않음 (편집 내용 유실 방지)
+            if (AppState.currentScreen === 'admin' && (AppState.formDirty || AppState.editingProjectId)) return;
+            if (etag) AppState.dataVersion = etag;
             if (JSON.stringify(projects) === JSON.stringify(AppState.projects)) return;
             AppState.projects = projects;
             renderDashboard();
@@ -51,6 +62,11 @@ function _initSocket() {
             if (sessionId === _mySessionId) return;
             _lockedProjects.set(projId, { sessionId, userName });
             _applyLockBadges();
+        });
+
+        // 외부 사용자 변경 시 admin room으로 서버가 직접 전송
+        _socket.on('admin_notify', ({ action_label }) => {
+            showAdminBanner(action_label ? `다른 사용자: ${action_label}` : '다른 사용자가 데이터를 업데이트했습니다.');
         });
 
         // 편집 완료/취소

@@ -104,3 +104,6 @@
 }
 .gantt-drag-tip.show { display: block; }
 .gantt-drag-tip em { color: rgba(255,255,255,0.5); font-style: normal; margin: 0 4px; }
+.gantt-drag-tip .tip-delta { font-weight: 700; margin-left: 1px; }
+.gantt-drag-tip .tip-delta.pos { color: #86efac; }
+.gantt-drag-tip .tip-delta.neg { color: #fca5a5; }

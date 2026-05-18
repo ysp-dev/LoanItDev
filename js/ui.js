@@ -3,13 +3,156 @@ const AUTO_REFRESH_INTERVAL = 10 * 60 * 1000;
 
 function _startPeriodicRefresh() {
     setInterval(async () => {
-        if (AppState.currentView === 'admin') return;
+        if (AppState.currentScreen === 'admin') return;
         AppState.projects = await loadFromStorage();
         renderDashboard();
     }, AUTO_REFRESH_INTERVAL);
 }
 
-// 대시보드 유휴 자동 새로고침 (1분 무액션 시, 5초 후 카운트다운 표시)
+// 1시간 주기 페이지 자동 리로드 (관리자 화면이거나 편집 중이면 건너뜀)
+setInterval(() => {
+    if (AppState.currentScreen === 'admin' || AppState.formDirty || AppState.editingProjectId != null) return;
+    location.reload();
+}, 60 * 60 * 1000);
+
+// 화면 보호기 방지 (Wake Lock + Canvas video 이중 방어)
+(function () {
+    let _wl = null;
+    let _wlPending = null;
+    let _retryTimer = null;
+    let _heartbeat = null;
+    let _fbVideo = null;
+    let _fbCanvas = null;
+    let _fbCtx = null;
+    let _fbFrameTimer = null;
+    let _fbPlayTimer = null;
+    let _fbUnsupported = false;
+    let _started = false;
+
+    function _isVisible() {
+        return document.visibilityState === 'visible' && !document.hidden;
+    }
+
+    function _scheduleAcquire(delay) {
+        clearTimeout(_retryTimer);
+        if (!_isVisible()) return;
+        _retryTimer = setTimeout(_acquire, delay);
+    }
+
+    function _playFallbackVideo() {
+        if (!_fbVideo || !_isVisible()) return;
+        clearTimeout(_fbPlayTimer);
+        const playPromise = _fbVideo.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {
+                clearTimeout(_fbPlayTimer);
+                _fbPlayTimer = setTimeout(_playFallbackVideo, 30000);
+            });
+        }
+    }
+
+    // Wake Lock 미지원 또는 실패 시: 1px canvas 스트림 video 재생으로 화면 활성 유지
+    function _ensureFallbackVideo() {
+        if (_fbUnsupported) return;
+        if (!_fbVideo) {
+            _fbCanvas = document.createElement('canvas');
+            _fbCanvas.width = 2; _fbCanvas.height = 2;
+            _fbCtx = _fbCanvas.getContext('2d');
+            if (!_fbCanvas.captureStream || !_fbCtx) {
+                _fbUnsupported = true;
+                return;
+            }
+
+            _fbVideo = document.createElement('video');
+            _fbVideo.srcObject = _fbCanvas.captureStream(1);
+            _fbVideo.muted = true;
+            _fbVideo.autoplay = true;
+            _fbVideo.loop = true;
+            _fbVideo.setAttribute('playsinline', '');
+            _fbVideo.setAttribute('aria-hidden', 'true');
+            _fbVideo.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0.001;pointer-events:none;top:0;left:0;z-index:-1;';
+            document.body.appendChild(_fbVideo);
+            _fbVideo.addEventListener('pause', _playFallbackVideo);
+            _fbVideo.addEventListener('ended', _playFallbackVideo);
+        }
+
+        if (!_fbFrameTimer) {
+            let tick = 0;
+            const drawFrame = () => {
+                tick = (tick + 1) % 255;
+                _fbCtx.fillStyle = `rgb(${tick},${255 - tick},${tick % 2 ? 32 : 64})`;
+                _fbCtx.fillRect(0, 0, 2, 2);
+            };
+            drawFrame();
+            _fbFrameTimer = setInterval(drawFrame, 1000);
+        }
+        _playFallbackVideo();
+    }
+
+    async function _acquire() {
+        clearTimeout(_retryTimer);
+        if (!_isVisible()) return;
+        _ensureFallbackVideo();
+        if (!('wakeLock' in navigator)) return;
+        if (_wl || _wlPending) return;
+        try {
+            _wlPending = navigator.wakeLock.request('screen');
+            const sentinel = await _wlPending;
+            _wl = sentinel;
+            sentinel.addEventListener('release', () => {
+                if (_wl === sentinel) _wl = null;
+                // 예기치 않은 해제(리로드 직후 포함) 시 5초 후 재시도
+                _scheduleAcquire(5000);
+            });
+        } catch (e) {
+            // 획득 실패 시 fallback은 유지하고 30초 후 재시도
+            _scheduleAcquire(30000);
+        } finally {
+            _wlPending = null;
+        }
+    }
+
+    // 탭 복귀 시 즉시 재획득
+    document.addEventListener('visibilitychange', () => {
+        if (_isVisible()) {
+            _ensureFallbackVideo();
+            _acquire();
+        }
+    });
+    ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, () => {
+            if (!_wl) { _ensureFallbackVideo(); _acquire(); }
+        }, { passive: true });
+    });
+
+    window._startWakeLock = function () {
+        if (_started) return;
+        _started = true;
+        _ensureFallbackVideo();
+        _acquire();
+        // 30초마다 상태 점검 — 조용히 해제된 경우 복구
+        _heartbeat = setInterval(() => {
+            if (!_isVisible()) return;
+            if (_fbVideo?.paused) _playFallbackVideo();
+            if (!_wl) _acquire();
+        }, 30000);
+    };
+
+    window._wakeLockDebug = function () {
+        return {
+            visible: _isVisible(),
+            wakeLockActive: !!_wl,
+            wakeLockPending: !!_wlPending,
+            fallbackVideoReady: !!_fbVideo,
+            fallbackVideoPaused: _fbVideo ? _fbVideo.paused : null,
+            fallbackUnsupported: _fbUnsupported,
+            retryScheduled: !!_retryTimer,
+            heartbeatStarted: !!_heartbeat
+        };
+    };
+})();
+
+// 대시보드 유휴 자동 새로고침 (10분 무액션 시 리로드, 1분 경과 후 카운트다운 표시)
 let _idleTimer = null;
 let _idleShowTimer = null;
 let _idleCountdownInterval = null;
@@ -62,6 +205,7 @@ function switchView(view, isEdit = false) {
     }
     AppState.formDirty = false;
     if(view === 'dashboard') {
+        AppState.currentScreen = 'dashboard';
         const dv = document.getElementById('dashboardView');
         dv.style.display = 'block';
         dv.classList.remove('view-fade'); void dv.offsetWidth; dv.classList.add('view-fade');
@@ -74,6 +218,7 @@ function switchView(view, isEdit = false) {
         _startIdleReload();
         renderDashboard();
     } else {
+        AppState.currentScreen = 'admin';
         _stopIdleReload();
         document.getElementById('dashboardView').style.display = 'none';
         const av = document.getElementById('adminView');
@@ -141,12 +286,18 @@ let _ganttDragged = false;
 
 function setSearch(val) { AppState.currentSearch = val.trim(); renderDashboard(); }
 
-function toggleCompact() {
-    AppState.compactView = !AppState.compactView;
-    const btn = document.getElementById('btn-compact');
-    if (btn) btn.classList.toggle('active', AppState.compactView);
+function setDensity(level) {
+    if (AppState.density === level) return;
+    AppState.density = level;
     const gc = document.getElementById('gantt-rows');
-    if (gc) gc.classList.toggle('gantt-compact', AppState.compactView);
+    if (gc) {
+        gc.classList.remove('gantt-comfortable', 'gantt-compact');
+        if (level === 'comfortable') gc.classList.add('gantt-comfortable');
+        if (level === 'compact')     gc.classList.add('gantt-compact');
+    }
+    document.querySelectorAll('.density-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.density === level);
+    });
     drawDepLines();
     requestAnimationFrame(autoFitBarFonts);
 }
@@ -181,17 +332,24 @@ function toggleAllListChk(checked) {
     onListChkChange();
 }
 
-function deleteSelected() {
+async function deleteSelected() {
     const listIds = [...document.querySelectorAll('.list-row-chk:checked')].map(c => parseInt(c.dataset.id));
     const cardIds = [...document.querySelectorAll('.card-row-chk:checked')].map(c => parseInt(c.dataset.id));
     const ids = [...new Set([...listIds, ...cardIds])];
     if (!ids.length) return;
     if (!confirm(`선택한 ${ids.length}건의 프로젝트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
     saveHistory(`선택 삭제 ${ids.length}건`);
+    const prevProjects = AppState.projects.slice();
     AppState.projects = AppState.projects.filter(p => !ids.includes(p.id));
-    saveToStorage();
+    const saved = await saveToStorage(ids, `프로젝트 ${ids.length}건 삭제`);
+    if (!saved) {
+        AppState.projects = prevProjects;
+        renderDashboard();
+        return;
+    }
     renderDashboard();
     showMsg(`${ids.length}건의 프로젝트가 삭제되었습니다.`);
+    showAdminBanner(`프로젝트 ${ids.length}건 삭제 완료`);
     const btn = document.getElementById('btn-delete-selected');
     if (btn) btn.style.display = 'none';
 }
@@ -229,7 +387,7 @@ function updateTeamFilterCounts() {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         const team = btn.dataset.team;
         const count = team === '전체' ? total : (counts[team] || 0);
-        btn.innerHTML = `${team}<span class="tag-count">${count}</span>`;
+        btn.innerHTML = `${escapeHtml(team)}<span class="tag-count">${count}</span>`;
     });
 }
 
@@ -317,13 +475,12 @@ function updateCmdPal() {
         _cmdSelIdx = -1; return;
     }
 
-    const teamStyleMap = { '여신심사팀':'color-team-a', '여신업무팀':'color-team-b', '여신관리팀':'color-team-c', '상품/신용평가팀':'color-team-d', '외환팀':'color-team-e', 'PPR팀':'color-team-f' };
     res.innerHTML = `<div class="cmdpal-section-label">${q ? '검색 결과' : '전체 프로젝트'}</div>` +
         matched.map((p, i) => {
             const styles = getStyleSet(p.team);
             return `<div class="cmdpal-item${i === _cmdSelIdx ? ' selected' : ''}" data-idx="${i}" onclick="cmdPalSelect(${i})" onmouseover="_cmdSelIdx=${i};renderCmdPalSel()">
-                <div class="cmdpal-item-icon" style="background:${statusBgForPalette(p)};color:${statusFgForPalette(p)};">${p.team.slice(0,2)}</div>
-                <div><div class="cmdpal-item-name">${p.name}</div><div class="cmdpal-item-meta">${p.team} · 담당자 ${p.pm} · ${calcDDay(p.open, new Date()).text}</div></div>
+                <div class="cmdpal-item-icon" style="background:${statusBgForPalette(p)};color:${statusFgForPalette(p)};">${escapeHtml(p.team.slice(0,2))}</div>
+                <div><div class="cmdpal-item-name">${escapeHtml(p.name)}</div><div class="cmdpal-item-meta">${escapeHtml(p.team)} · 담당자 ${escapeHtml(p.pm)} · ${calcDDay(p.open, new Date()).text}</div></div>
             </div>`;
         }).join('');
     _cmdSelIdx = -1;
@@ -401,11 +558,18 @@ function saveHistory(label) {
     if (AppState.commandHistory.length > 10) AppState.commandHistory.shift();
 }
 
-function undoLast() {
+async function undoLast() {
     const entry = AppState.commandHistory.pop();
     if (!entry) { showMsg('되돌릴 작업이 없습니다.', 'warn'); return; }
+    const prevProjects = AppState.projects;
     AppState.projects = entry.snapshot;
-    saveToStorage();
+    const saved = await saveToStorage([], '실행 취소');
+    if (!saved) {
+        AppState.projects = prevProjects;
+        AppState.commandHistory.push(entry);
+        renderDashboard();
+        return;
+    }
     renderDashboard();
     showMsg(`실행 취소: ${entry.label}`);
 }
@@ -475,7 +639,7 @@ function handleImportFile(e, isMerge) {
         e.target.value = ''; return;
     }
     const reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = async function(ev) {
         try {
             // BOM 제거 후 파싱
             const text = ev.target.result.replace(/^﻿/, '');
@@ -488,34 +652,53 @@ function handleImportFile(e, isMerge) {
                 e.target.value = ''; return;
             }
 
-            // 필수 필드 검증
-            const invalid = incoming.filter(p => !p.name || !p.team || !Array.isArray(p.phaseDetails) || p.phaseDetails.length === 0);
+            const incomingProjects = _normalizeProjectList(incoming);
+
+            // 필수 필드 및 일정 검증
+            const invalid = [];
+            incomingProjects.forEach((p) => {
+                const errors = [];
+                if (!p.name) errors.push('프로젝트명 누락');
+                if (!p.team) errors.push('담당팀 누락');
+                if (!p.pm) errors.push('담당자 누락');
+                const schedule = validateProjectSchedule(p);
+                if (!schedule.valid) errors.push(schedule.errors[0].message);
+                if (errors.length > 0) invalid.push({ name: p.name || '(이름없음)', message: errors.join(', ') });
+                else p.phaseDetails = schedule.phaseDetails;
+            });
             if (invalid.length > 0) {
-                showMsg(`데이터 손상 ${invalid.length}건 — 필수 필드 누락\n(${invalid.map(p => p.name || '(이름없음)').slice(0,3).join(', ')}${invalid.length > 3 ? '...' : ''})`, 'error');
+                showMsg(`데이터 손상 ${invalid.length}건 — 필수 필드 또는 일정 오류\n(${invalid.map(p => p.name).slice(0,3).join(', ')}${invalid.length > 3 ? '...' : ''})`, 'error');
                 e.target.value = ''; return;
             }
 
+            const prevProjects = AppState.projects.slice();
             if (isMerge) {
                 // 병합: 기존 프로젝트명 기준으로 중복 제외
                 const existingNames = new Set(AppState.projects.map(p => p.name));
-                const toAdd = incoming.filter(p => !existingNames.has(p.name));
-                const skipped = incoming.length - toAdd.length;
+                const toAdd = incomingProjects.filter(p => !existingNames.has(p.name));
+                const skipped = incomingProjects.length - toAdd.length;
                 if (toAdd.length === 0) {
                     showMsg(`신규 프로젝트 없음 — ${skipped}개 모두 이미 존재하는 프로젝트명`, 'warn');
                     e.target.value = ''; return;
                 }
-                const msg = `[병합 가져오기]\n\n신규 추가: ${toAdd.length}개\n중복 제외: ${skipped}개${skipped > 0 ? '\n  -> ' + incoming.filter(p => existingNames.has(p.name)).map(p => p.name).join(', ') : ''}\n\n계속하시겠습니까?`;
+                const msg = `[병합 가져오기]\n\n신규 추가: ${toAdd.length}개\n중복 제외: ${skipped}개${skipped > 0 ? '\n  -> ' + incomingProjects.filter(p => existingNames.has(p.name)).map(p => p.name).join(', ') : ''}\n\n계속하시겠습니까?`;
                 if (!confirm(msg)) { e.target.value = ''; return; }
                 toAdd.forEach(p => { p.id = Date.now() + Math.random(); });
                 AppState.projects = [...AppState.projects, ...toAdd];
             } else {
                 const exportedAt = raw.exportedAt ? new Date(raw.exportedAt).toLocaleString('ko-KR') : '알 수 없음';
-                const msg = `[가져오기 - 덮어쓰기]\n\n파일 내 프로젝트: ${incoming.length}개\n내보낸 시각: ${exportedAt}\n\n[!] 현재 데이터(${AppState.projects.length}개)가 모두 교체됩니다.\n계속하시겠습니까?`;
+                const msg = `[가져오기 - 덮어쓰기]\n\n파일 내 프로젝트: ${incomingProjects.length}개\n내보낸 시각: ${exportedAt}\n\n[!] 현재 데이터(${AppState.projects.length}개)가 모두 교체됩니다.\n계속하시겠습니까?`;
                 if (!confirm(msg)) { e.target.value = ''; return; }
-                AppState.projects = incoming;
+                AppState.projects = incomingProjects;
             }
 
-            saveToStorage();
+            const saved = await saveToStorage([], '데이터 가져오기', AppState.projects, { replaceYear: !isMerge });
+            if (!saved) {
+                AppState.projects = prevProjects;
+                renderDashboard();
+                e.target.value = '';
+                return;
+            }
             AppState.currentFilter = '전체';
             renderDashboard();
             showMsg(`${isMerge ? '병합' : '가져오기'} 완료 — 현재 ${AppState.projects.length}개 프로젝트`);
@@ -548,13 +731,22 @@ async function setYear(year) {
 
 async function resetAllData() {
     if (!confirm('[!] 저장된 모든 프로젝트 데이터를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) return;
+    try {
+        const headers = AppState.dataVersion ? { 'If-Match': AppState.dataVersion } : {};
+        const res = await fetch('/api/projects', { method: 'DELETE', headers });
+        if (!res.ok) {
+            showMsg(`전체 삭제 실패 (${res.status})`, 'error');
+            return;
+        }
+        AppState.dataVersion = res.headers.get('ETag') || AppState.dataVersion;
+    } catch(e) {
+        showMsg('서버에 연결할 수 없어 전체 삭제를 완료하지 못했습니다.', 'error');
+        return;
+    }
     // 모든 연도의 로컬스토리지 제거
     Object.keys(localStorage)
         .filter(k => k.startsWith('si_projects_'))
         .forEach(k => localStorage.removeItem(k));
-    try {
-        await fetch('/api/projects', { method: 'DELETE' });
-    } catch(e) {}
     AppState.projects = [];
     AppState.currentFilter = '전체';
     renderDashboard();
@@ -568,31 +760,6 @@ function _applyTheme(theme) {
     if (lbl) lbl.innerText = theme === 'dark' ? '라이트모드' : '다크모드';
 }
 
-function _autoTheme() {
-    const h = new Date().getHours();
-    return (h >= 17 || h < 6) ? 'dark' : 'light';
-}
-
-function _scheduleAutoTheme() {
-    const now = new Date();
-    const h = now.getHours();
-    const next = new Date(now);
-    if (h < 6) {
-        next.setHours(6, 0, 0, 0);
-    } else if (h < 17) {
-        next.setHours(17, 0, 0, 0);
-    } else {
-        next.setDate(next.getDate() + 1);
-        next.setHours(6, 0, 0, 0);
-    }
-    setTimeout(function() {
-        _applyTheme(_autoTheme());
-        if (typeof clearColorCache === 'function') clearColorCache();
-        if (typeof renderDashboard === 'function') renderDashboard();
-        _scheduleAutoTheme();
-    }, next - now);
-}
-
 function toggleTheme() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     _applyTheme(isDark ? 'light' : 'dark');
@@ -601,6 +768,5 @@ function toggleTheme() {
 }
 
 (function() {
-    _applyTheme(_autoTheme());
-    _scheduleAutoTheme();
+    _applyTheme(localStorage.getItem('si-theme') || 'dark');
 })();

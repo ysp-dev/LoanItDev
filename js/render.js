@@ -33,9 +33,6 @@ function buildBarAreaHtml(p) {
         const endX   = getDatePos(clippedEnd);
         const widthX = Math.max(MIN_BAR_WIDTH, endX - startX);
 
-        const safeDesc = (pd.desc||'')
-            .replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n')
-            .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         const pdEnd = new Date(pdEndDate); pdEnd.setHours(23,59,59);
         const phaseState = now > pdEnd ? 'phase-done' : (now >= pdStartDate ? 'phase-active' : '');
         const continuesCls = (endsNextYear   ? ' phase-continues'      : '') +
@@ -45,7 +42,7 @@ function buildBarAreaHtml(p) {
         // 단계 번호를 이름("1단계:...")에서 추출, 없으면 순서(idx+1) 사용
         const phaseNum   = parseInt(pd.name.match(/^(\d+)단계/)?.[1]) || (idx + 1);
         const barColor   = resolveColor(`var(--phase-${Math.min(5, Math.max(1, phaseNum))})`);
-        return `<div class="phase-bar ${idx===0?'first-phase':''} ${phaseState}${continuesCls}" data-pname="${barLabel.replace(/"/g,'&quot;')}" data-start="${pd.start}" data-end="${pd.end}" data-desc="${safeBarDesc}" data-proj-id="${p.id}" data-phase-idx="${idx}" style="left:${startX}%;width:${widthX}%;background-color:${barColor};background-image:linear-gradient(to bottom,rgba(255,255,255,0.30) 0%,rgba(255,255,255,0.06) 50%,rgba(0,0,0,0.08) 100%);">${barLabel}</div>`;
+        return `<div class="phase-bar ${idx===0?'first-phase':''} ${phaseState}${continuesCls}" data-pname="${escapeHtml(barLabel)}" data-start="${pd.start}" data-end="${pd.end}" data-desc="${escapeHtml(safeBarDesc)}" data-proj-id="${p.id}" data-phase-idx="${idx}" style="left:${startX}%;width:${widthX}%;background-color:${barColor};background-image:linear-gradient(to bottom,rgba(255,255,255,0.30) 0%,rgba(255,255,255,0.06) 50%,rgba(0,0,0,0.08) 100%);">${escapeHtml(barLabel)}</div>`;
     }).join('');
     const gridLines = Array.from({length:12},(_,mi)=>{
         const now2=new Date();
@@ -78,7 +75,7 @@ function drawDepLines() {
     const hasDeps = AppState.projects.some(p => p.deps && p.deps.length > 0);
 
     let svg = document.getElementById('dep-lines-svg');
-    if (!hasDeps || AppState.compactView) {
+    if (!hasDeps || AppState.density === 'compact') {
         if (svg) svg.innerHTML = '';
         return;
     }
@@ -157,7 +154,7 @@ function renderAlertBanner() {
 
     const now = new Date(); now.setHours(0, 0, 0, 0);
     const urgent = AppState.projects.filter(p => {
-        const diff = Math.round((new Date(p.open) - now) / MS_PER_DAY);
+        const diff = Math.round((parseDate(p.open) - now) / MS_PER_DAY);
         return diff >= 0 && diff <= 10;
     }).sort((a, b) => new Date(a.open) - new Date(b.open));
 
@@ -181,8 +178,8 @@ function renderAlertBanner() {
                 const ddayText = diff === 0 ? 'D-Day' : `D-${diff}`;
                 return `<div class="alert-item ${cls}" onclick="editProject(${p.id})" title="클릭하여 수정">
                     <span class="alert-dday">${ddayText}</span>
-                    <span class="alert-name">${p.name}</span>
-                    <span class="alert-team">${p.team}</span>
+                    <span class="alert-name">${escapeHtml(p.name)}</span>
+                    <span class="alert-team">${escapeHtml(p.team)}</span>
                     <span class="alert-open">${fmtD(p.open)}</span>
                 </div>`;
             }).join('')}
@@ -218,12 +215,12 @@ function _buildGanttRowEl(p, rowIdx) {
     });
     div.innerHTML = `
         <div class="project-info">
-            <span class="team-tag ${styles.light}" style="font-size:9px; padding:1px 4px;">${p.team}</span>
-            <div class="project-name">${p.name}</div>
+            <span class="team-tag ${styles.light}" style="font-size:9px; padding:1px 4px;">${escapeHtml(p.team)}</span>
+            <div class="project-name">${escapeHtml(p.name)}</div>
             <div class="project-meta">
                 <span class="project-meta-sep">·</span>
-                ${p.part ? `<span class="pm-val">${p.part}</span><span class="project-meta-sep">·</span>` : ''}
-                <span>담당자 <span class="pm-val">${p.pm}</span></span>
+                ${p.part ? `<span class="pm-val">${escapeHtml(p.part)}</span><span class="project-meta-sep">·</span>` : ''}
+                <span>담당자 <span class="pm-val">${escapeHtml(p.pm)}</span></span>
             </div>
         </div>
         <div class="bar-area">${buildBarAreaHtml(p)}</div>`;
@@ -248,19 +245,19 @@ function _buildCardHtml(p, cardIdx, q, now) {
     let statusBg, statusFg, statusTxt;
     if (activePhase) {
         statusBg='#dbeafe'; statusFg='#1d4ed8';
-        statusTxt = (activePhase.name.split(':')[1]||activePhase.name).trim() + ' 진행중';
+        statusTxt = escapeHtml((activePhase.name.split(':')[1]||activePhase.name).trim()) + ' 진행중';
     } else if (now < parseDate(p.phaseDetails[0]?.start)) {
         statusBg='#f1f5f9'; statusFg='#64748b'; statusTxt='착수 준비중';
     } else if (now >= openDate) {
         statusBg='#d1fae5'; statusFg='#065f46'; statusTxt='개발 완료';
     } else if (isGap && displayPhase) {
         statusBg='#ede9fe'; statusFg='#5b21b6';
-        statusTxt = (displayPhase.name.split(':')[1]||displayPhase.name).trim() + ' 준비중';
+        statusTxt = escapeHtml((displayPhase.name.split(':')[1]||displayPhase.name).trim()) + ' 준비중';
     } else {
         statusBg='#ede9fe'; statusFg='#5b21b6'; statusTxt='오픈 준비중';
     }
 
-    const openD = new Date(p.open);
+    const openD = parseDate(p.open);
     const diffDays = Math.round((openD - now) / MS_PER_DAY);
     let ddayText, ddayColor, ddayBg;
     if (diffDays > 0) {
@@ -281,7 +278,7 @@ function _buildCardHtml(p, cardIdx, q, now) {
     const phaseSection = shownPhase ? `
         <hr class="card-divider">
         <div class="card-phase-row">
-            <span class="card-phase-name">${(shownPhase.name.split(':')[1]||shownPhase.name).trim()}</span><span style="font-size:0.62rem;color:#94a3b8;font-weight:600;margin:0 5px 0 0;">${shownLabel}</span>
+            <span class="card-phase-name">${escapeHtml((shownPhase.name.split(':')[1]||shownPhase.name).trim())}</span><span style="font-size:0.62rem;color:#94a3b8;font-weight:600;margin:0 5px 0 0;">${shownLabel}</span>
             <span class="card-phase-date">${fmtD(shownPhase.start)} ~ ${fmtD(shownPhase.end)}</span>
         </div>
         ${shownDesc ? `<div class="card-phase-desc" style="margin-top:4px;">${shownDesc}</div>` : ''}` : '';
@@ -375,7 +372,7 @@ function _buildListRowHtml(p, idx, q, now) {
         ${td('duration',`<span class="list-duration">${durStr}</span>`)}
         ${td('dday',`<span class="dday-badge ${ddayCls}">${ddayTxt}</span>`)}
         ${td('open',`<span class="dday-badge ${openCls}">${fmtD(p.open)}</span>`)}
-        ${td('phase',`<span class="list-phase">${curPhase}</span>`)}
+        ${td('phase',`<span class="list-phase">${escapeHtml(curPhase)}</span>`)}
         ${td('tags', (p.tags?.length ? p.tags.map(tid => { const tag = PRESET_TAGS.find(t=>t.id===tid); return tag ? `<span class="tag-badge" style="background:${tag.bg};color:${tag.fg};">${tag.label}</span>` : ''; }).join(' ') : '<span style="color:#ccc;">—</span>'))}
     </tr>`;
 }
@@ -482,7 +479,11 @@ function renderDashboard() {
         .slice().sort((a, b) => new Date(a.open) - new Date(b.open));
 
     const gc = document.getElementById('gantt-rows');
-    if (gc) gc.classList.toggle('gantt-compact', AppState.compactView);
+    if (gc) {
+        gc.classList.remove('gantt-comfortable', 'gantt-compact');
+        if (AppState.density === 'comfortable') gc.classList.add('gantt-comfortable');
+        if (AppState.density === 'compact')     gc.classList.add('gantt-compact');
+    }
     const now = new Date();
     const todayMidnight = new Date(now); todayMidnight.setHours(0,0,0,0);
 
@@ -655,7 +656,7 @@ function autoFitBarFonts() {
         const w = bar.offsetWidth;
         if (w <= 0) return;
 
-        // 3일 이하: 단계명 불필요, 숨김
+        // 3일 이하: 단계명 숨김
         const days = (bar.dataset.start && bar.dataset.end)
             ? Math.round((new Date(bar.dataset.end) - new Date(bar.dataset.start)) / 86400000) + 1
             : Infinity;
@@ -665,26 +666,34 @@ function autoFitBarFonts() {
             return;
         }
 
-        // inline 스타일 초기화 → CSS 기본값으로 복귀
+        // inline 초기화 → CSS 기본값 복귀 (clip-path 화살촉 여백 유지를 위해 padding은 건드리지 않음)
         bar.style.fontSize = '';
         bar.style.padding  = '';
 
-        // 텍스트가 넘치지 않으면 그대로
+        // 편안하게: 자동 축소 없음, ellipsis 처리
+        if (AppState.density === 'comfortable') return;
+
+        // 이진탐색: CSS padding 유지, 막대를 꽉 채우는 최대 폰트 탐색
+        // 기본: 1rem, 촘촘하게: 편안하게 기준(0.9rem)과 동일한 상한
+        const maxRem = AppState.density === 'compact' ? 0.9 : 1.0;
+        const minRem = 0.44;
+
+        // 상한에서 이미 맞으면 그대로
+        bar.style.fontSize = maxRem + 'rem';
         if (bar.scrollWidth <= bar.clientWidth) return;
 
-        // 넘치면 단계적으로 축소, 최소 0.44rem 유지 (숨기지 않음)
-        const steps = [
-            { fontSize: '0.72rem', padding: '' },
-            { fontSize: '0.6rem',  padding: '' },
-            { fontSize: '0.52rem', padding: '0 4px' },
-            { fontSize: '0.44rem', padding: '0 2px' },
-        ];
-        for (const step of steps) {
-            bar.style.fontSize = step.fontSize;
-            bar.style.padding  = step.padding;
-            if (bar.scrollWidth <= bar.clientWidth) break;
+        // 최솟값도 넘치면 ellipsis
+        bar.style.fontSize = minRem + 'rem';
+        if (bar.scrollWidth > bar.clientWidth) return;
+
+        // 이진탐색 (정밀도 0.01rem, 약 6회 수렴)
+        let lo = minRem, hi = maxRem;
+        while (hi - lo > 0.01) {
+            const mid = (lo + hi) / 2;
+            bar.style.fontSize = mid + 'rem';
+            if (bar.scrollWidth <= bar.clientWidth) lo = mid; else hi = mid;
         }
-        // 0.44rem에서도 넘치면 말줄임(…)으로 처리 (CSS text-overflow 유지)
+        bar.style.fontSize = lo + 'rem';
     });
 }
 

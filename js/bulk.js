@@ -132,11 +132,12 @@ function clearBulkGrid() {
     addBulkRow();
 }
 
-function saveBulk() {
+async function saveBulk() {
     if (bulkRids.length === 0) { showMsg('등록할 데이터가 없습니다. 행을 추가해 주세요.'); return; }
     const checkedRids = [...document.querySelectorAll('.bulk-chk:checked')].map(el => parseInt(el.dataset.rid));
     if (checkedRids.length === 0) { showMsg('등록할 행을 체크해 주세요.'); return; }
-    let saved = 0, errors = [];
+    const prevProjects = AppState.projects.slice();
+    let saved = 0, errors = [], warnings = [];
     for (const r of checkedRids) {
         const rowNum = bulkRids.indexOf(r) + 1;
         const name = (document.getElementById(`bg-name-${r}`)?.value || '').trim();
@@ -150,18 +151,25 @@ function saveBulk() {
         if (!part)    { errors.push(`${rowNum}행 [${name}]: 담당파트를 입력해 주세요.`); continue; }
         if (!pm)      { errors.push(`${rowNum}행 [${name}]: 담당자가 입력되지 않았습니다.`); continue; }
         if (!openVal) { errors.push(`${rowNum}행 [${name}]: 적용예정일이 입력되지 않았습니다.`); continue; }
-        const phaseDetails = [];
+        const rawPhaseDetails = [];
+        const colors = ['var(--phase-1)','var(--phase-2)','var(--phase-3)','var(--phase-4)','var(--phase-5)'];
         for (let p = 1; p <= 5; p++) {
             const pn = (document.getElementById(`bg-p${p}n-${r}`)?.value || '').trim();
             const ps = document.getElementById(`bg-p${p}s-${r}`)?.value || '';
             const pe = document.getElementById(`bg-p${p}e-${r}`)?.value || '';
             const pd = (document.getElementById(`bg-p${p}d-${r}`)?.value || '').trim();
-            if (pn && ps && pe) {
-                const colors = ['var(--phase-1)','var(--phase-2)','var(--phase-3)','var(--phase-4)','var(--phase-5)'];
-                phaseDetails.push({ name: `${p}단계:${pn}`, start: ps, end: pe, color: colors[p-1], desc: pd });
-            }
+            rawPhaseDetails.push({ phaseNo: p, name: pn, start: ps, end: pe, color: colors[p-1], desc: pd });
         }
-        if (phaseDetails.length === 0) { errors.push(`${rowNum}행 [${name}]: 단계 정보가 없습니다. (단계명·시작일·종료일 모두 필요)`); continue; }
+        const schedule = validateProjectSchedule(
+            { open: openVal, phaseDetails: rawPhaseDetails },
+            { phaseNameFormatter: (phaseName, _idx, raw) => `${raw.phaseNo}단계:${phaseName}` }
+        );
+        if (!schedule.valid) {
+            errors.push(`${rowNum}행 [${name}]: ${schedule.errors[0].message}`);
+            continue;
+        }
+        warnings.push(...schedule.warnings.map(w => `${rowNum}행 [${name}]: ${w.message}`));
+        const phaseDetails = schedule.phaseDetails;
         const isDup = AppState.projects.some(pr => pr.name === name);
         if (isDup) { errors.push(`${rowNum}행 [${name}]: 동일한 프로젝트명이 이미 등록되어 있습니다.`); continue; }
         const tagStr = (document.getElementById(`bg-tags-${r}`)?.value || '');
@@ -173,18 +181,38 @@ function saveBulk() {
         AppState.projects.push({ id: Date.now() + r, team, part, pm, clientDept: client, name, open: openVal, phaseDetails, tags });
         saved++;
     }
-    if (saved > 0) { saveToStorage(); renderDashboard(); }
+    if (saved > 0 && warnings.length > 0) {
+        const preview = warnings.slice(0, 8).join('\n');
+        const more = warnings.length > 8 ? `\n... 외 ${warnings.length - 8}건` : '';
+        if (!confirm(`[일정 확인]\n\n${preview}${more}\n\n그대로 등록하시겠습니까?`)) {
+            AppState.projects = prevProjects;
+            renderDashboard();
+            showMsg('일괄 등록이 취소되었습니다.', 'warn');
+            return;
+        }
+    }
+    if (saved > 0) {
+        const persisted = await saveToStorage([], `일괄 등록 ${saved}건`);
+        if (!persisted) {
+            AppState.projects = prevProjects;
+            renderDashboard();
+            return;
+        }
+        renderDashboard();
+    }
     const errPanel = document.getElementById('bulk-error-panel');
     if (errors.length > 0) {
         if (errPanel) {
             errPanel.style.display = 'block';
-            errPanel.innerHTML = `<div class="bulk-err-title">⚠️ 등록 실패 ${errors.length}건</div>${errors.map(e => `<div class="bulk-err-item">${e}</div>`).join('')}`;
+            errPanel.innerHTML = `<div class="bulk-err-title">⚠️ 등록 실패 ${errors.length}건</div>${errors.map(e => `<div class="bulk-err-item">${escapeHtml(e)}</div>`).join('')}`;
             errPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         showMsg(saved > 0 ? `${saved}건 등록 완료 (${errors.length}건 실패)` : `등록 실패 ${errors.length}건`, saved > 0 ? '' : 'error');
+        if (saved > 0) showAdminBanner(`일괄 등록 ${saved}건 완료 (실패 ${errors.length}건)`);
     } else {
         if (errPanel) errPanel.style.display = 'none';
         showMsg(saved > 0 ? `${saved}건 등록 완료` : '등록 가능한 행이 없습니다.');
+        if (saved > 0) showAdminBanner(`일괄 등록 ${saved}건 완료`);
     }
 }
 
@@ -244,4 +272,3 @@ function importBulkCSV(event) {
     reader.readAsText(file, 'UTF-8');
     event.target.value = '';
 }
-

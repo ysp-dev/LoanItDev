@@ -25,11 +25,12 @@ function _populateDepSelect(excludeId) {
         const styles = getStyleSet(p.team);
         const lastEnd = p.phaseDetails?.at(-1)?.end || p.open || '';
         const endStr  = lastEnd ? ` <em>${fmtD(lastEnd)} 완료</em>` : '';
+        const id = Number(p.id);
         return `<label class="dep-item" data-proj-id="${p.id}" style="--dep-color:${styles.hex}">
-            <input type="checkbox" class="dep-chk" value="${p.id}">
+            <input type="checkbox" class="dep-chk" value="${id}">
             <span class="dep-item-check">✓</span>
-            <span class="dep-item-team" style="background:${styles.hex}22;color:${styles.hex};">${p.team}</span>
-            <span class="dep-item-name">${p.name}${endStr}</span>
+            <span class="dep-item-team" style="background:${styles.hex}22;color:${styles.hex};">${escapeHtml(p.team)}</span>
+            <span class="dep-item-name">${escapeHtml(p.name)}${endStr}</span>
         </label>`;
     }).join('');
 
@@ -313,19 +314,27 @@ function resetForm(silent = false) {
     if(!silent) showMsg('모든 항목이 초기화되었습니다.');
 }
 
-function deleteProject() {
+async function deleteProject() {
     if (!AppState.editingProjectId) return;
     const p = AppState.projects.find(item => item.id === AppState.editingProjectId);
     if (!p) return;
     if (!confirm(`'${p.name}' 프로젝트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
     saveHistory(`'${p.name}' 삭제`);
+    const prevProjects = AppState.projects.slice();
+    const deletedId = AppState.editingProjectId;
+    AppState.projects = AppState.projects.filter(item => item.id !== deletedId);
+    const saved = await saveToStorage([deletedId], `'${p.name}' 프로젝트 삭제`);
+    if (!saved) {
+        AppState.projects = prevProjects;
+        renderDashboard();
+        return;
+    }
     if (typeof unlockProject === 'function') unlockProject(AppState.editingProjectId);
-    AppState.projects = AppState.projects.filter(item => item.id !== AppState.editingProjectId);
-    saveToStorage();
     AppState.editingProjectId = null;
     switchView('dashboard');
     renderDashboard();
     showMsg(`'${p.name}' 프로젝트가 삭제되었습니다.`);
+    showAdminBanner(`'${p.name}' 프로젝트 삭제 완료`);
 }
 
 function editProject(id) {
@@ -373,7 +382,7 @@ function editProject(id) {
     syncDateWraps();
 }
 
-function saveNewProject() {
+async function saveNewProject() {
     const name = document.getElementById('in-name').value.trim();
     const team = document.getElementById('in-team').value;
     const part = document.getElementById('in-part').value.trim();
@@ -402,55 +411,39 @@ function saveNewProject() {
         document.getElementById('in-name').focus(); return;
     }
 
-    // ── 6. 단계별 일정 수집 및 부분 입력 체크 ────────
-    const phaseDetails = [];
+    // ── 6. 단계별 일정 수집 및 공통 일정 검증 ────────
+    const rawPhaseDetails = [];
     for (let i = 1; i <= 5; i++) {
         const pName  = document.getElementById(`ph-name-${i}`).value.trim();
         const pStart = document.getElementById(`ph-start-${i}`).value;
         const pEnd   = document.getElementById(`ph-end-${i}`).value;
         const pDesc  = document.getElementById(`ph-desc-${i}`).value.trim();
-
-        const hasAny = pName || pStart || pEnd;
-        const hasAll = pName && pStart && pEnd;
-
-        if (hasAny && !hasAll) {
-            const missing = [];
-            if (!pName)  missing.push('단계 이름');
-            if (!pStart) missing.push('시작일');
-            if (!pEnd)   missing.push('종료일');
-            showMsg(`${i}단계: ${missing.join(', ')}을(를) 입력해 주세요.\n(일부만 입력된 단계는 등록할 수 없습니다.)`, 'warn');
-            document.getElementById(`ph-name-${i}`).focus(); return;
-        }
-
-        if (hasAll) {
-            if (pStart > pEnd) {
-                showMsg(`${i}단계: 시작일(${pStart})이 종료일(${pEnd})보다 늦습니다.\n날짜를 확인해 주세요.`, 'warn');
-                document.getElementById(`ph-start-${i}`).focus(); return;
-            }
-            if (phaseDetails.length > 0 && pStart < phaseDetails[phaseDetails.length-1].end) {
-                showMsg(`${i}단계 시작일(${pStart})이 이전 단계 종료일(${phaseDetails[phaseDetails.length-1].end})보다 이전입니다.\n단계 일정은 순서대로 입력해 주세요.`, 'warn');
-                document.getElementById(`ph-start-${i}`).focus(); return;
-            }
-            phaseDetails.push({
-                name: `${i}단계:${pName}`,
-                start: pStart,
-                end: pEnd,
-                color: `var(--phase-${i})`,
-                desc: pDesc
-            });
-        }
+        rawPhaseDetails.push({ phaseNo: i, name: pName, start: pStart, end: pEnd, color: `var(--phase-${i})`, desc: pDesc });
     }
 
-    if (phaseDetails.length === 0) {
-        showMsg('최소 1개 이상의 단계 일정을 입력해 주세요.\n(단계 이름 + 시작일 + 종료일 모두 필요)', 'warn');
-        document.getElementById('ph-name-1').focus(); return;
+    const schedule = validateProjectSchedule(
+        { open: openVal, phaseDetails: rawPhaseDetails },
+        { phaseNameFormatter: (phaseName, _idx, raw) => `${raw.phaseNo}단계:${phaseName}` }
+    );
+    if (!schedule.valid) {
+        const err = schedule.errors[0];
+        const suffix = err.phaseIndex !== null && err.message.includes('입력해 주세요')
+            ? '\n(일부만 입력된 단계는 등록할 수 없습니다.)'
+            : '';
+        showMsg(err.message + suffix, 'warn');
+        const phaseNo = Number(rawPhaseDetails[err.phaseIndex]?.phaseNo || 1);
+        const focusId = err.field === 'open'
+            ? 'in-open'
+            : `ph-${err.field || 'name'}-${phaseNo}`;
+        document.getElementById(focusId)?.focus();
+        return;
     }
 
+    const phaseDetails = schedule.phaseDetails;
     // ── 7. 오픈일 vs 마지막 단계 종료일 비교 ─────────
-    const lastPhaseEnd = phaseDetails[phaseDetails.length - 1].end;
-    if (openVal < lastPhaseEnd) {
+    if (schedule.warnings.length > 0) {
         const confirmProceed = confirm(
-            `[!] 적용예정일(${openVal})이\n마지막 단계 종료일(${lastPhaseEnd})보다 이전입니다.\n\n그대로 등록하시겠습니까?`
+            `[!] ${schedule.warnings[0].message}\n\n그대로 등록하시겠습니까?`
         );
         if (!confirmProceed) { document.getElementById('in-open').focus(); return; }
     }
@@ -460,18 +453,33 @@ function saveNewProject() {
     const deps = getSelectedDeps();
     const projectData = { id: AppState.editingProjectId || Date.now(), team, part, pm, clientDept, name, open: openVal, phaseDetails, tags, deps };
 
+    const prevProjects = AppState.projects.slice();
+    let nextProjects = AppState.projects.slice();
     if (AppState.editingProjectId) {
         saveHistory(`'${name}' 수정 전`);
-        const index = AppState.projects.findIndex(p => p.id === AppState.editingProjectId);
-        AppState.projects[index] = projectData;
+        const index = nextProjects.findIndex(p => p.id === AppState.editingProjectId);
+        if (index === -1) {
+            showMsg('수정 대상 프로젝트를 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+            return;
+        }
+        nextProjects[index] = projectData;
     } else {
-        AppState.projects.push(projectData);
+        nextProjects.push(projectData);
     }
 
+    const _actionLabel = AppState.editingProjectId ? `'${name}' 프로젝트 수정` : `'${name}' 프로젝트 등록`;
+    AppState.projects = nextProjects;
+    const saved = await saveToStorage([], _actionLabel);
+    if (!saved) {
+        AppState.projects = prevProjects;
+        AppState.formDirty = true;
+        renderDashboard();
+        return;
+    }
     AppState.formDirty = false;
     if (typeof unlockProject === 'function') unlockProject(AppState.editingProjectId);
-    saveToStorage();
     showMsg(AppState.editingProjectId ? `'${name}' 프로젝트가 수정되었습니다.` : `'${name}' 프로젝트가 등록되었습니다.`);
+    showAdminBanner(_actionLabel + ' 완료');
     AppState.editingProjectId = null;
     renderDashboard();
     switchView('dashboard');

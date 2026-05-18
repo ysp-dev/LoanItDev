@@ -1,6 +1,79 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 관리자 상단 배너 */
+#admin-action-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+    background: #1e40af; color: #fff;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; font-size: 0.95rem; font-weight: 600;
+    box-shadow: 0 3px 14px rgba(0,0,0,.35);
+    transform: translateY(-110%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+    pointer-events: none;
+}
+#admin-action-banner.visible { transform: translateY(0); pointer-events: auto; }
+#admin-action-banner .admin-banner-text { flex: 1; }
+#admin-action-banner .admin-banner-close {
+    background: rgba(255,255,255,.2); border: none; color: #fff;
+    padding: 3px 12px; border-radius: 4px; cursor: pointer; font-size: .85rem;
+}
+#admin-action-banner .admin-banner-close:hover { background: rgba(255,255,255,.35); }
+
+/* 관리자 알림 벨 */
+#admin-notif-bell { display: flex; align-items: center; }
+.admin-bell-btn {
+    position: relative; background: none; border: none; cursor: pointer;
+    font-size: 1.15rem; padding: 4px 8px; border-radius: 6px;
+    color: var(--text-color, #334155); transition: background .15s;
+}
+.admin-bell-btn:hover { background: var(--hover-bg, rgba(0,0,0,.07)); }
+.admin-bell-badge {
+    position: absolute; top: 0; right: 0;
+    background: #ef4444; color: #fff;
+    font-size: 0.62rem; font-weight: 700; line-height: 1;
+    min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+}
+
+/* 관리자 알림 패널 */
+#admin-notif-panel {
+    position: fixed; top: 52px; right: 12px; z-index: 9998;
+    width: 340px; max-height: 420px;
+    background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.18);
+    display: flex; flex-direction: column; overflow: hidden;
+    opacity: 0; pointer-events: none; transform: translateY(-8px);
+    transition: opacity .2s, transform .2s;
+}
+#admin-notif-panel.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.anp-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background: var(--header-bg, #f8fafc);
+}
+.anp-title { flex: 1; font-size: .85rem; font-weight: 700; color: var(--text-color, #1e293b); }
+.anp-read-all, .anp-close {
+    background: none; border: none; cursor: pointer; font-size: .78rem;
+    color: var(--text-muted, #64748b); padding: 2px 6px; border-radius: 4px;
+}
+.anp-read-all:hover, .anp-close:hover { background: var(--hover-bg, #f1f5f9); }
+.anp-list { overflow-y: auto; max-height: 360px; }
+.anp-empty { padding: 24px; text-align: center; color: var(--text-muted, #94a3b8); font-size: .85rem; }
+.anp-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border-color, #f1f5f9);
+    transition: background .12s;
+}
+.anp-item:hover { background: var(--hover-bg, #f8fafc); }
+.anp-item.read { opacity: .5; }
+.anp-item-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #3b82f6;
+    flex-shrink: 0; margin-top: 5px;
+}
+.anp-item.read .anp-item-dot { background: transparent; }
+.anp-item-text { flex: 1; font-size: .82rem; color: var(--text-color, #334155); line-height: 1.45; word-break: break-all; }
+.anp-item-time { font-size: .72rem; color: var(--text-muted, #94a3b8); flex-shrink: 0; margin-top: 2px; }
+
 /* 전체 placeholder 연한 회색 통일 */
 ::placeholder { color: #c0c8d2; opacity: 1; }
 ::-webkit-input-placeholder { color: #c0c8d2; }
@@ -198,6 +271,9 @@ header {
     box-shadow: 0 1px 3px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.9);
     border-left: 4px solid #ddd6ce;
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 /* 통계 카드 개별 강조색 */
 .stat-card.sc-total   { border-left-color: var(--primary); }
@@ -208,7 +284,7 @@ header {
 .stat-card.sc-done    .value { color: var(--emerald); }
 .stat-card.sc-early   { border-left-color: #a3e635; }
 .stat-card.sc-early   .value { color: #65a30d; }
-.stat-card .label { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 2px; font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; }
+.stat-card .label { font-size: 0.8rem; color: var(--text-sub); font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; }
 .stat-card .value { font-size: 1.55rem; font-weight: 900; letter-spacing: -0.04em; }
 
 /* KB 팔레트 팀 태그 */

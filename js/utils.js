@@ -17,7 +17,9 @@ function fmtD(str) {
 
 // D-Day 계산 → { text, cls }
 function calcDDay(openStr, now) {
-    const diff = Math.round((new Date(openStr) - now) / MS_PER_DAY);
+    // 양쪽 모두 로컬 자정으로 정규화해 시간대 오프셋 오류 방지
+    const today = new Date(now); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((parseDate(openStr) - today) / MS_PER_DAY);
     if (diff > 0)      return { text: `D-${diff}`,           cls: diff <= 7 ? 'dday-urgent' : diff <= 30 ? 'dday-warn' : 'dday-normal' };
     if (diff === 0)    return { text: 'D-Day',               cls: 'dday-today' };
     return             { text: `D+${Math.abs(diff)}`,        cls: 'dday-past' };
@@ -33,7 +35,7 @@ function calcCurPhase(p, now) {
     });
     if (ap) return (ap.name.split(':')[1] || ap.name).trim();
     const fst = parseDate(p.phaseDetails[0].start);
-    const openDt = new Date(p.open); openDt.setHours(23, 59, 59);
+    const openDt = parseDate(p.open); openDt.setHours(23, 59, 59);
     if (now < fst) return '착수 준비중';
     if (now > openDt) return '개발 완료';
     const next = p.phaseDetails.find(pd => parseDate(pd.start) > now);
@@ -44,17 +46,17 @@ function calcCurPhase(p, now) {
 function calcDuration(p) {
     const empty = { periodStart: '-', periodEnd: '-', durStr: '-' };
     if (!p.phaseDetails?.length) return empty;
-    const ss = p.phaseDetails.map(d => new Date(d.start)).filter(d => !isNaN(d));
-    const ee = p.phaseDetails.map(d => new Date(d.end)).filter(d => !isNaN(d));
+    const ss = p.phaseDetails.map(d => parseDate(d.start)).filter(d => d && !isNaN(d));
+    const ee = p.phaseDetails.map(d => parseDate(d.end)).filter(d => d && !isNaN(d));
     if (!ss.length || !ee.length) return empty;
     const e0 = new Date(Math.min(...ss));
     const phaseEnd = new Date(Math.max(...ee));
-    const openDate = new Date(p.open);
+    const openDate = parseDate(p.open);
     const e1 = openDate > phaseEnd ? openDate : phaseEnd;
     const mo = (e1.getFullYear() - e0.getFullYear()) * 12 + (e1.getMonth() - e0.getMonth()) + 1;
     return {
-        periodStart: fmtD(e0.toISOString().slice(0, 10)),
-        periodEnd:   fmtD(e1.toISOString().slice(0, 10)),
+        periodStart: fmtD(dateToStr(e0)),
+        periodEnd:   fmtD(dateToStr(e1)),
         durStr:      `${mo}개월`
     };
 }
@@ -136,7 +138,7 @@ function getStyleSet(team) {
 }
 
 function formatOpenTag(openStr) {
-    const date = new Date(openStr);
+    const date = parseDate(openStr);
     const yy = String(date.getFullYear()).slice(-2);
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
@@ -176,12 +178,119 @@ function normalizeDate(str) {
     return str; // 그 외 원본 반환
 }
 
+const PROJECT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidProjectDate(str) {
+    str = String(str || '');
+    if (!PROJECT_DATE_RE.test(str)) return false;
+    const [y, m, d] = str.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+function validateProjectSchedule(project, options = {}) {
+    const errors = [];
+    const warnings = [];
+    const addError = (message, phaseIndex = null, field = null) => errors.push({ message, phaseIndex, field });
+    const addWarning = (message, field = null) => warnings.push({ message, field });
+    const open = String(project?.open || '');
+
+    if (!isValidProjectDate(open)) {
+        addError('적용예정일 형식이 올바르지 않습니다.', null, 'open');
+    }
+
+    if (!Array.isArray(project?.phaseDetails)) {
+        addError('단계 일정 정보가 올바르지 않습니다.');
+        return { valid: false, errors, warnings, phaseDetails: [] };
+    }
+
+    const phaseDetails = [];
+    let previousEnd = null;
+    for (let idx = 0; idx < project.phaseDetails.length; idx++) {
+        const raw = project.phaseDetails[idx];
+        const phaseNo = Number.isFinite(Number(raw?.phaseNo)) ? Number(raw.phaseNo) : idx + 1;
+        const label = `${phaseNo}단계`;
+        if (!raw || typeof raw !== 'object') {
+            addError(`${label}: 단계 정보가 올바르지 않습니다.`, idx);
+            continue;
+        }
+
+        const rawName = String(raw.name || '').trim();
+        const start = String(raw.start || '');
+        const end = String(raw.end || '');
+        const hasAny = rawName || start || end;
+        const hasAll = rawName && start && end;
+
+        if (!hasAny) continue;
+        if (!hasAll) {
+            const missing = [];
+            if (!rawName) missing.push('단계 이름');
+            if (!start) missing.push('시작일');
+            if (!end) missing.push('종료일');
+            const field = !rawName ? 'name' : (!start ? 'start' : 'end');
+            addError(`${label}: ${missing.join(', ')}을(를) 입력해 주세요.`, idx, field);
+            continue;
+        }
+        if (!isValidProjectDate(start)) {
+            addError(`${label}: 시작일 형식이 올바르지 않습니다.`, idx, 'start');
+            continue;
+        }
+        if (!isValidProjectDate(end)) {
+            addError(`${label}: 종료일 형식이 올바르지 않습니다.`, idx, 'end');
+            continue;
+        }
+        if (start > end) {
+            addError(`${label}: 시작일(${start})이 종료일(${end})보다 늦습니다.`, idx, 'start');
+            continue;
+        }
+        if (previousEnd && start < previousEnd) {
+            addError(`${label} 시작일(${start})이 이전 단계 종료일(${previousEnd})보다 이전입니다.`, idx, 'start');
+            continue;
+        }
+
+        const name = typeof options.phaseNameFormatter === 'function'
+            ? options.phaseNameFormatter(rawName, idx, raw)
+            : rawName;
+        phaseDetails.push({
+            ...raw,
+            name,
+            start,
+            end,
+            color: String(raw.color || `var(--phase-${phaseNo})`),
+            desc: String(raw.desc || '')
+        });
+        previousEnd = end;
+    }
+
+    if (phaseDetails.length === 0) {
+        addError('최소 1개 이상의 단계 일정을 입력해 주세요.', 0, 'name');
+    }
+
+    const lastEnd = phaseDetails.at(-1)?.end;
+    if (isValidProjectDate(open) && lastEnd && open < lastEnd) {
+        addWarning(`적용예정일(${open})이 마지막 단계 종료일(${lastEnd})보다 이전입니다.`, 'open');
+    }
+
+    return { valid: errors.length === 0, errors, warnings, phaseDetails };
+}
+
 /* ⑤ 통계 count-up */
+/* ⑧ HTML 이스케이프 */
+function escapeHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
+
 /* ⑨ 검색어 하이라이트 helper */
 function hl(str, q) {
-    if (!q || !str) return str || '';
-    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return String(str).replace(new RegExp(escaped, 'gi'), m => `<span class="search-hl">${m}</span>`);
+    const safe = escapeHtml(str);
+    if (!q) return safe;
+    const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    return safe.replace(re, m => `<span class="search-hl">${m}</span>`);
 }
 
 function _countUp(id, target, fmt, color) {
@@ -207,6 +316,106 @@ function _countUp(id, target, fmt, color) {
     if (lv) lv.addEventListener('scroll', () => lv.classList.toggle('scrolled', lv.scrollTop > 2));
 })();
 
+
+// 로컬호스트 관리자 전용 알림 시스템
+const _IS_LOCALHOST = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+const _notifHistory = [];
+let _notifUnread = 0;
+
+function _initAdminUI() {
+    if (!_IS_LOCALHOST) return;
+
+    // 상단 배너
+    const banner = document.createElement('div');
+    banner.id = 'admin-action-banner';
+    banner.innerHTML = '<span class="admin-banner-icon">🔔</span><span class="admin-banner-text"></span><button class="admin-banner-close" onclick="this.closest(\'#admin-action-banner\').classList.remove(\'visible\')">닫기</button>';
+    document.body.appendChild(banner);
+
+    // 알림 벨 버튼 (nav-tabs에 삽입)
+    const bell = document.createElement('div');
+    bell.id = 'admin-notif-bell';
+    bell.innerHTML = '<button class="admin-bell-btn" onclick="toggleAdminNotif()" title="관리자 알림 이력">🔔<span class="admin-bell-badge" id="admin-bell-badge" style="display:none">0</span></button>';
+    const navSep = document.querySelector('.nav-tabs .nav-sep');
+    if (navSep) navSep.parentNode.insertBefore(bell, navSep);
+
+    // 알림 패널
+    const panel = document.createElement('div');
+    panel.id = 'admin-notif-panel';
+    panel.innerHTML = `
+        <div class="anp-header">
+            <span class="anp-title">관리자 알림 이력</span>
+            <button class="anp-read-all" onclick="markAllAdminNotif()">전체 읽음</button>
+            <button class="anp-close" onclick="toggleAdminNotif()">✕</button>
+        </div>
+        <div class="anp-list" id="admin-notif-list"><div class="anp-empty">알림이 없습니다.</div></div>`;
+    document.body.appendChild(panel);
+
+    // 패널 외부 클릭 시 닫기
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#admin-notif-panel') && !e.target.closest('#admin-notif-bell'))
+            panel.classList.remove('open');
+    });
+}
+
+function _addNotification(text) {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    _notifHistory.unshift({ text, time, read: false });
+    _notifUnread++;
+
+    const badge = document.getElementById('admin-bell-badge');
+    if (badge) { badge.textContent = _notifUnread > 99 ? '99+' : _notifUnread; badge.style.display = ''; }
+
+    const list = document.getElementById('admin-notif-list');
+    if (list) {
+        list.innerHTML = _notifHistory.map((n, i) =>
+            `<div class="anp-item${n.read ? ' read' : ''}" onclick="readAdminNotif(${i})">
+                <span class="anp-item-dot"></span>
+                <span class="anp-item-text">${escapeHtml(n.text)}</span>
+                <span class="anp-item-time">${escapeHtml(n.time)}</span>
+            </div>`
+        ).join('');
+    }
+}
+
+function toggleAdminNotif() {
+    const panel = document.getElementById('admin-notif-panel');
+    if (panel) panel.classList.toggle('open');
+}
+
+function readAdminNotif(idx) {
+    if (_notifHistory[idx] && !_notifHistory[idx].read) {
+        _notifHistory[idx].read = true;
+        _notifUnread = Math.max(0, _notifUnread - 1);
+        const badge = document.getElementById('admin-bell-badge');
+        if (badge) {
+            if (_notifUnread === 0) badge.style.display = 'none';
+            else badge.textContent = _notifUnread > 99 ? '99+' : _notifUnread;
+        }
+        document.querySelectorAll('.anp-item')[idx]?.classList.add('read');
+    }
+}
+
+function markAllAdminNotif() {
+    _notifHistory.forEach(n => n.read = true);
+    _notifUnread = 0;
+    const badge = document.getElementById('admin-bell-badge');
+    if (badge) badge.style.display = 'none';
+    document.querySelectorAll('.anp-item').forEach(el => el.classList.add('read'));
+}
+
+function showAdminBanner(text) {
+    if (!_IS_LOCALHOST) return;
+    _addNotification(text);
+    const el = document.getElementById('admin-action-banner');
+    if (!el) return;
+    el.querySelector('.admin-banner-text').textContent = '[관리자] ' + text;
+    clearTimeout(el._t);
+    el.classList.add('visible');
+    el._t = setTimeout(() => el.classList.remove('visible'), 5000);
+}
+
+document.addEventListener('DOMContentLoaded', _initAdminUI);
 
 function showMsg(text, type) {
     const el = document.getElementById('msgBox');

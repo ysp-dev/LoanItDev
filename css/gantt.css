@@ -87,7 +87,7 @@
     display: flex; align-items: center; justify-content: center;
     color: var(--chart-text); font-size: 0.9rem; font-weight: 800;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-    padding: 0 14px 0 18px; transition: all 0.3s; cursor: pointer;
+    padding: 0 14px 0 18px; transition: background-color 0.3s, filter 0.3s, opacity 0.3s; cursor: pointer;
     z-index: 5;
     clip-path: polygon(calc(100% - 10px) 0%, 100% 50%, calc(100% - 10px) 100%, 0% 100%, 10px 50%, 0% 0%);
 }
@@ -116,31 +116,31 @@
 }
 
 .today-line {
-    position: absolute; top: 0; bottom: 0; width: 1px;
+    position: absolute; top: 0; bottom: 0; width: 2px;
     background: linear-gradient(to bottom,
         transparent 0%,
-        rgba(239,68,68,0.95) 4%,
-        #ef4444 12%,
-        #ef4444 88%,
-        rgba(239,68,68,0.95) 96%,
+        rgba(255,90,90,0.95) 4%,
+        #ff5555 12%,
+        #ff5555 88%,
+        rgba(255,90,90,0.95) 96%,
         transparent 100%);
     z-index: 50; pointer-events: none;
-    filter: drop-shadow(0 0 2px rgba(239,68,68,0.45));
+    filter: drop-shadow(0 0 5px rgba(255,85,85,0.85)) drop-shadow(0 0 2px rgba(255,85,85,0.6));
 }
 .today-dot {
     position: absolute; top: 18px; left: 50%; transform: translateX(-50%) translateZ(0);
     width: 9px; height: 9px;
-    background: #ef4444; border-radius: 50%;
+    background: #ff5555; border-radius: 50%;
     border: 2px solid white;
-    box-shadow: 0 0 0 1.5px #ef4444;
+    box-shadow: 0 0 0 1.5px #ff5555, 0 0 10px rgba(255,85,85,0.7);
     animation: today-pulse 2.4s ease-out infinite;
     will-change: transform;
     z-index: 51;
 }
 @keyframes today-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.75), 0 0 0 1.5px #ef4444; }
-    65%  { box-shadow: 0 0 0 7px rgba(239,68,68,0),  0 0 0 1.5px #ef4444; }
-    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0),    0 0 0 1.5px #ef4444; }
+    0%   { box-shadow: 0 0 0 0 rgba(255,85,85,0.75), 0 0 0 1.5px #ff5555; }
+    65%  { box-shadow: 0 0 0 7px rgba(255,85,85,0),  0 0 0 1.5px #ff5555; }
+    100% { box-shadow: 0 0 0 0 rgba(255,85,85,0),    0 0 0 1.5px #ff5555; }
 }
 .past-overlay {
     position: absolute; top: 0; bottom: 0; left: 0;
@@ -163,7 +163,14 @@
 .gantt-row:nth-child(even) .bar-area { background: #F8F8F8; }
 .gantt-row:nth-child(even) .open-col { background: #F8F8F8; }
 
-/* 컴팩트 뷰 */
+/* 편안하게 뷰 */
+.gantt-comfortable .gantt-row { padding: 7px 0; }
+.gantt-comfortable .bar-area { height: 40px; }
+.gantt-comfortable .phase-bar { top: 4px; bottom: 4px; }
+.gantt-comfortable .project-name { font-size: 0.9rem; }
+.gantt-comfortable .today-dot { top: 17px; width: 9px; height: 9px; }
+
+/* 촘촘하게 뷰 */
 .gantt-compact .gantt-row { padding: 1px 0; }
 .gantt-compact .project-meta { display: none; }
 .gantt-compact .team-tag { display: none; }
@@ -172,15 +179,28 @@
 .gantt-compact .phase-bar { top: 1px; bottom: 1px; font-size: 0.72rem; }
 .gantt-compact .open-col .milestone { font-size: 8px; padding: 2px 4px; }
 .gantt-compact .today-dot { top: 10px; width: 7px; height: 7px; }
-.btn-compact { padding: 4px 12px; border-radius: var(--r-sm); font-size: 0.72rem; font-weight: 800; border: 1.5px solid #DDDDDD; background: #F0F0F0; color: #666666; cursor: pointer; font-family: inherit; transition: all 0.18s; white-space: nowrap; letter-spacing: 0.02em; }
-.btn-compact:hover:not(.active) { background: #E6E6E6; border-color: #BBBBBB; color: #222222; }
-.btn-compact.active { background: #3F3F42; color: #FFD338; border-color: #3F3F42; box-shadow: 0 2px 6px rgba(63,63,66,0.35); }
 
-/* 3. 행 hover highlight — KB Yellow 힌트 */
-.gantt-row { transition: background 0.15s; }
-.gantt-row:hover { background: #FFF8E6; }
-.gantt-row:hover .bar-area { background: #FFF8E6; }
-.gantt-row:hover .open-col { background: #FFF8E6; }
+/* 밀도 컨트롤 버튼 그룹 */
+.density-group { display: flex; gap: 1px; border-radius: var(--r-sm); overflow: hidden; border: 1.5px solid #DDDDDD; }
+.density-btn { padding: 4px 8px; font-size: 0.72rem; font-weight: 700; background: #F0F0F0; color: #666666; cursor: pointer; font-family: inherit; white-space: nowrap; border: none; transition: background 0.15s, color 0.15s; letter-spacing: 0.01em; }
+.density-btn:hover:not(.active) { background: #E6E6E6; color: #222222; }
+.density-btn.active { background: #3F3F42; color: #FFD338; }
+
+/* 행 hover: 집중 강조 + 비호버 행 dim */
+.gantt-row { transition: background 0.15s, opacity 0.18s; }
+
+.gantt-row:hover {
+    background: #FFF0B8;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08), 0 -1px 0 rgba(255,211,56,0.25);
+}
+.gantt-row:hover .bar-area { background: #FFF0B8; }
+.gantt-row:hover .open-col { background: #FFF0B8; }
+
+#gantt-rows:has(.gantt-row:hover) .gantt-row:not(:hover) {
+    opacity: 0.42;
+}
 
 /* 6. 사이드바 부서 배지 강조 */
 .team-tag { box-shadow: 0 1px 3px rgba(0,0,0,0.1); letter-spacing: 0.01em; }

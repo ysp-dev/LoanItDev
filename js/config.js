@@ -13,13 +13,6 @@ const PRESET_TAGS = [
 ];
 const MS_PER_DAY    = 86400000;
 const MIN_BAR_WIDTH = 0.3;
-const BAR_FONT_STEPS = [
-    { maxW: 16, fontSize: '0',       padding: '0' },
-    { maxW: 28, fontSize: '0.44rem', padding: '0 2px' },
-    { maxW: 45, fontSize: '0.52rem', padding: '0 4px' },
-    { maxW: 70, fontSize: '0.6rem',  padding: '' },
-    { maxW: 95, fontSize: '0.72rem', padding: '' },
-];
 
 const LIST_COLS = [
     { key: 'no',       label: 'No',           sortFn: null },
@@ -42,9 +35,11 @@ const AppState = {
     currentFilter:   '전체',
     currentSearch:   '',
     currentView:     'card',
+    currentScreen:   'dashboard',
     currentTagFilter: null,
     editingProjectId: null,
-    compactView:     false,
+    dataVersion:     null,
+    density:         'normal',
     listSortCol:     null,
     listSortDir:     1,
     listColVisible:  Object.fromEntries(LIST_COLS.map(c => [c.key, true])),
