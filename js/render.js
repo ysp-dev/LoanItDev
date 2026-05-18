@@ -638,25 +638,51 @@ function toggleListCol(key, visible) {
 }
 
 function autoFitCardTitles() {
-    document.querySelectorAll('.card-proj-name').forEach(el => {
-        el.style.fontSize = '';
-        const MIN_FS = 11;
-        let fs = parseFloat(getComputedStyle(el).fontSize);
-        while (fs > MIN_FS) {
-            const lh = parseFloat(getComputedStyle(el).lineHeight);
-            if (el.scrollHeight <= Math.ceil(lh) + 2) break;
-            fs -= 0.5;
-            el.style.fontSize = fs + 'px';
-        }
-    });
+    const els = [...document.querySelectorAll('.card-proj-name')];
+    if (!els.length) return;
+
+    // 1단계 — 쓰기: 폰트 크기 초기화
+    els.forEach(el => { el.style.fontSize = ''; });
+
+    // 2단계 — 읽기: 초기 scrollHeight / lineHeight 일괄 측정 (reflow 1회)
+    const MIN_FS = 11;
+    const toShrink = els.map(el => {
+        const fs = parseFloat(getComputedStyle(el).fontSize);
+        const lh = parseFloat(getComputedStyle(el).lineHeight);
+        const fits = el.scrollHeight <= Math.ceil(lh) + 2;
+        return { el, fs, fits };
+    }).filter(d => !d.fits && d.fs > MIN_FS)
+      .map(d => ({ el: d.el, lo: MIN_FS, hi: d.fs }));
+
+    if (!toShrink.length) return;
+
+    // 3단계 — 이진탐색 7회: 쓰기 전부 후 읽기 전부 → reflow 7회 (카드 수와 무관)
+    for (let iter = 0; iter < 7; iter++) {
+        toShrink.forEach(item => {
+            item.mid = (item.lo + item.hi) / 2;
+            item.el.style.fontSize = item.mid + 'px';
+        });
+        toShrink.forEach(item => {
+            const lh = parseFloat(getComputedStyle(item.el).lineHeight);
+            if (item.el.scrollHeight <= Math.ceil(lh) + 2) item.lo = item.mid;
+            else item.hi = item.mid;
+        });
+    }
+
+    // 4단계 — 쓰기: 최종 폰트 크기 일괄 적용
+    toShrink.forEach(item => { item.el.style.fontSize = item.lo + 'px'; });
 }
 
 function autoFitBarFonts() {
-    document.querySelectorAll('.phase-bar').forEach(bar => {
-        const w = bar.offsetWidth;
-        if (w <= 0) return;
+    const bars = [...document.querySelectorAll('.phase-bar')];
+    if (!bars.length) return;
 
-        // 3일 이하: 단계명 숨김
+    const maxRem = AppState.density === 'compact' ? 0.9 : 1.0;
+    const minRem = 0.44;
+
+    // 1단계 — 쓰기: 스타일 초기화 및 3일 이하 숨김, 후보 수집
+    const toFit = [];
+    bars.forEach(bar => {
         const days = (bar.dataset.start && bar.dataset.end)
             ? Math.round((new Date(bar.dataset.end) - new Date(bar.dataset.start)) / 86400000) + 1
             : Infinity;
@@ -665,36 +691,43 @@ function autoFitBarFonts() {
             bar.style.padding  = '0';
             return;
         }
-
-        // inline 초기화 → CSS 기본값 복귀 (clip-path 화살촉 여백 유지를 위해 padding은 건드리지 않음)
         bar.style.fontSize = '';
         bar.style.padding  = '';
-
-        // 편안하게: 자동 축소 없음, ellipsis 처리
-        if (AppState.density === 'comfortable') return;
-
-        // 이진탐색: CSS padding 유지, 막대를 꽉 채우는 최대 폰트 탐색
-        // 기본: 1rem, 촘촘하게: 편안하게 기준(0.9rem)과 동일한 상한
-        const maxRem = AppState.density === 'compact' ? 0.9 : 1.0;
-        const minRem = 0.44;
-
-        // 상한에서 이미 맞으면 그대로
-        bar.style.fontSize = maxRem + 'rem';
-        if (bar.scrollWidth <= bar.clientWidth) return;
-
-        // 최솟값도 넘치면 ellipsis
-        bar.style.fontSize = minRem + 'rem';
-        if (bar.scrollWidth > bar.clientWidth) return;
-
-        // 이진탐색 (정밀도 0.01rem, 약 6회 수렴)
-        let lo = minRem, hi = maxRem;
-        while (hi - lo > 0.01) {
-            const mid = (lo + hi) / 2;
-            bar.style.fontSize = mid + 'rem';
-            if (bar.scrollWidth <= bar.clientWidth) lo = mid; else hi = mid;
-        }
-        bar.style.fontSize = lo + 'rem';
+        if (AppState.density !== 'comfortable') toFit.push(bar);
     });
+
+    if (!toFit.length) return;
+
+    // 2단계 — 쓰기: 전체를 maxRem으로 설정
+    toFit.forEach(bar => { bar.style.fontSize = maxRem + 'rem'; });
+
+    // 3단계 — 읽기: maxRem에서 넘치는 막대 추출 (reflow 1회)
+    const needShrink = toFit.filter(bar => bar.clientWidth > 0 && bar.scrollWidth > bar.clientWidth);
+    if (!needShrink.length) return;
+
+    // 4단계 — 쓰기: minRem으로 설정
+    needShrink.forEach(bar => { bar.style.fontSize = minRem + 'rem'; });
+
+    // 5단계 — 읽기: minRem에서도 넘치면 ellipsis로 두고 이진탐색 대상만 추출 (reflow 1회)
+    const bsItems = needShrink
+        .filter(bar => bar.scrollWidth <= bar.clientWidth)
+        .map(bar => ({ bar, lo: minRem, hi: maxRem }));
+    if (!bsItems.length) return;
+
+    // 6단계 — 이진탐색 7회: 쓰기를 전부 먼저, 읽기를 전부 나중에 → reflow 7회 (막대 수와 무관)
+    for (let iter = 0; iter < 7; iter++) {
+        bsItems.forEach(item => {
+            item.mid = (item.lo + item.hi) / 2;
+            item.bar.style.fontSize = item.mid + 'rem';
+        });
+        bsItems.forEach(item => {
+            if (item.bar.scrollWidth <= item.bar.clientWidth) item.lo = item.mid;
+            else item.hi = item.mid;
+        });
+    }
+
+    // 7단계 — 쓰기: 최종 폰트 크기 일괄 적용
+    bsItems.forEach(item => { item.bar.style.fontSize = item.lo + 'rem'; });
 }
 
 // ── 일괄 등록 그리드 ────────────────────────────

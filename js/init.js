@@ -60,7 +60,8 @@
         if (!bar) return;
         const r = bar.getBoundingClientRect();
         const rx = e.clientX - r.left;
-        bar.style.cursor = (rx <= 10 || rx >= r.width - 10) ? 'ew-resize' : 'grab';
+        const cur = (rx <= 10 || rx >= r.width - 10) ? 'ew-resize' : 'grab';
+        if (bar.style.cursor !== cur) bar.style.cursor = cur;
     });
 
     document.addEventListener('mousedown', function(e) {

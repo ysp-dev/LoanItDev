@@ -158,12 +158,15 @@ let _idleShowTimer = null;
 let _idleCountdownInterval = null;
 const IDLE_TIMEOUT = 10 * 60 * 1000;
 const IDLE_SHOW_AFTER = 60 * 1000;
-const _idleEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+const _idleEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
 function _updateCountdownEl(secs) {
     const el = document.getElementById('io-idle-countdown');
     if (!el) return;
-    if (secs === null) { el.style.display = 'none'; el.textContent = ''; return; }
+    if (secs === null) {
+        if (el.style.display !== 'none') { el.style.display = 'none'; el.textContent = ''; }
+        return;
+    }
     el.style.display = '';
     el.textContent = `· 새로고침 ${secs}분 전`;
 }
